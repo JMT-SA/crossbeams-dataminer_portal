@@ -18,7 +18,7 @@ module FloatingCanvas
       end
     end
 
-    class MySinatraApp < Sinatra::Application
+    class WebPortal < Sinatra::Application
 
       configure do
         enable :logging
