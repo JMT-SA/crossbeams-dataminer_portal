@@ -1,11 +1,11 @@
 # coding: utf-8
 lib = File.expand_path('../lib', __FILE__)
 $LOAD_PATH.unshift(lib) unless $LOAD_PATH.include?(lib)
-require 'floating_canvas/webtest/version'
+require 'floating_canvas/dataminer_portal/version'
 
 Gem::Specification.new do |spec|
-  spec.name          = "floating_canvas-webtest"
-  spec.version       = FloatingCanvas::Webtest::VERSION
+  spec.name          = "floating_canvas-dataminer_portal"
+  spec.version       = FloatingCanvas::DataminerPortal::VERSION
   spec.authors       = ["James Silberbauer"]
   spec.email         = ["jamessil@telkomsa.net"]
 

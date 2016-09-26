@@ -4,7 +4,7 @@ require 'sinatra/contrib'
 require 'sequel'
 
 module FloatingCanvas
-  module Webtest
+  module DataminerPortal
 
     class ConfigMerger
       # Write a new config file by applying the client-specific settings over the defaults.

@@ -1,5 +1,5 @@
 module FloatingCanvas
-  module Webtest
+  module DataminerPortal
     VERSION = "0.1.0"
   end
 end
