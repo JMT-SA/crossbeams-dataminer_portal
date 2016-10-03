@@ -36,6 +36,7 @@ module FloatingCanvas
         enable :show_exceptions # because we are forcing the environment to production...
         set :appname, 'tst'
         set :url_prefix, ENV['DM_PREFIX']  ? "#{ENV['DM_PREFIX']}/" : ''
+        set :protection, except: :frame_options # so it can be loaded in another app's iframe...
 
 
         set :base_file, "#{FileUtils.pwd}/config/dm_defaults.yml"
@@ -72,11 +73,15 @@ module FloatingCanvas
       end
 
       def lookup_report(id)
-        fn                = File.join(settings.dm_reports_location, '.dm_report_list.yml')
-        report_dictionary = YAML.load_file(fn)
-        this_report       = report_dictionary[id.to_i]
-        yp                = Dataminer::YamlPersistor.new(this_report[:file])
-        Dataminer::Report.load(yp)
+        DmReportLister.new(settings.dm_reports_location).get_report_by_id(id)
+      end
+
+      def clean_where(sql)
+        rems = sql.scan( /\{(.+?)\}/).flatten.map {|s| "#{s}={#{s}}" }
+        rems.each {|r| sql.gsub!(%r|and\s+#{r}|i,'') }
+        rems.each {|r| sql.gsub!(r,'') }
+        sql.sub!(/where\s*\(\s+\)/i, '')
+        sql
       end
 
 
@@ -94,37 +99,32 @@ module FloatingCanvas
             end
           end.join("\n")
         end
-        
+
+        def the_url_prefix
+          settings.url_prefix
+        end
+
         def menu
-          "<p>[#{settings.url_prefix}]<a href='/#{settings.url_prefix}index'>Index</a></p>"
+          "<p><a href='/#{settings.url_prefix}index'>Return to report index</a></p>"
         end
       end
 
 
       get '/' do
-        dataset = DB['select id from users']
-        "GOT THERE... running with #{settings.appname} <a href='#{settings.url_prefix}test_page'>Go to test page</a><p>Users: #{dataset.count} with ids: #{dataset.map(:id).join(', ')}.</p><p>Random user: #{DB['select user_name FROM users LIMIT 1'].first[:user_name]}</p>"
+        # dataset = DB['select id from users']
+        # "GOT THERE... running with #{settings.appname} <a href='#{settings.url_prefix}test_page'>Go to test page</a><p>Users: #{dataset.count} with ids: #{dataset.map(:id).join(', ')}.</p><p>Random user: #{DB['select user_name FROM users LIMIT 1'].first[:user_name]}</p>"
+        "<a href='/#{settings.url_prefix}index'>DATAMINER REPORT INDEX</a>"
       end
 
       get '/index' do
-        ymlfiles = File.join(settings.dm_reports_location, "**", "*.yml")
-        yml_list = Dir.glob( ymlfiles )#.map {|l| l.split('/')[1..99].join('/')} # Remove top-level of path.
-        rpt_list = []
-        rpt_set  = {}
-        yml_list.each_with_index do |yml_file, index|
-          yp = Dataminer::YamlPersistor.new(yml_file)
-          rpt_list << {id: index, file: yml_file, caption: Dataminer::Report.load(yp).caption }
-          rpt_set[index] = { file: yml_file, caption: Dataminer::Report.load(yp).caption }
-        end
-        File.open(File.join(settings.dm_reports_location, '.dm_report_list.yml'), 'w') { |f| YAML.dump(rpt_set, f) }
         # TODO: sort report list, group, add tags etc...
 
+        rpt_list = DmReportLister.new(settings.dm_reports_location).get_report_list(true)
+
         <<-EOS
-        <h1>Dataminer Reports</h1><p>#{yml_list.join('<br>')}</p>
+        <h1>Dataminer Reports</h1>
         <ol><li>#{rpt_list.map {|r| "<a href='/#{settings.url_prefix}report/#{r[:id]}'>#{r[:caption]}</a>" }.join('</li><li>')}</li></ol>
         EOS
-        # <ul><li>#{rpt_set.map {|k,v| "#{k}: #{v}" }.join('</li><li>')}</li></ul>
-        # <pre>#{File.read(File.join(settings.dm_reports_location, '.dm_report_list.yml'))}</pre>
       end
 
       get '/report/:id' do
@@ -132,11 +132,11 @@ module FloatingCanvas
         # report_dictionary = YAML.load_file(fn)
         # this_report = report_dictionary[params[:id].to_i]
         # yp = Dataminer::YamlPersistor.new(this_report[:file])
-        # rpt = Dataminer::Report.load(yp)
-        rpt = lookup_report(params[:id])
+        # @rpt = Dataminer::Report.load(yp)
+        @rpt = lookup_report(params[:id])
 
         # repos = DmRepository.new
-        # rpt = repos.get_report(params[:id].to_i)
+        # @rpt = repos.get_report(params[:id].to_i)
         #TODO: involve DB in calcing list contents
         @ops_text = <<-EOP
 <select name="%s_operator">
@@ -186,50 +186,19 @@ module FloatingCanvas
           ['is NOT blank', "not_null"]]
         # for date, s.b. between
         # for list, all but start,end,contain...
-        @qps = rpt.query_parameter_definitions
+        @qps = @rpt.query_parameter_definitions
         #<%= @ops_text % qp[:column] %>
         # input types: text, date, datetime-local, number
         # month, week, time
-        erb <<-EOS
-  <h1>Fill in params</h1>#{menu}
-  <form action='/#{settings.url_prefix}run_rpt#{params[:id]}' method=post>Report: #{rpt.caption}<br>
-  <% @qps.each do |qp| %>
-    <p><label><%=qp.caption %>
-    <select name="queryparam[<%=qp.column %>][operator]">
-    <% if qp.control_type == :list %>
-      <%= make_options(@ops_sel_ar)%>
-    <% elsif qp.control_type == :date %>
-      <%= make_options(@ops_date_ar)%>
-    <% else %>
-      <%= make_options(@ops_ar)%>
-    <% end %>
-    </select>
-    <% if qp.control_type == :list %>
-      <select name="queryparam[<%=qp.column %>][value]">
-      <option value=""></option>
-        <%= make_options(qp.build_list {|sql| DB[sql].all.map {|r| r.values } }.list_values) %>
-      </select>
-    <% elsif qp.control_type == :date %>
-      <input type="date" name="queryparam[<%=qp.column %>][from_value]" value="<%=qp.default_value %>" />
-      and
-      <input type="date" name="queryparam[<%=qp.column %>][to_value]" value="<%=qp.default_value %>" />
-    <% else %>
-      <input type="text" name="queryparam[<%=qp.column %>][value]" value="<%=qp.default_value %>" />
-    <% end %>
-    </label>
-    </p>
-  <% end %>
-  <p><label>Limit: <input type="number" name='limit' min="1" /></label>
-  <p><input type=submit></p>
-  </form>
-        EOS
 
+        @menu = menu
+        @report_action = "/#{settings.url_prefix}run_rpt/#{params[:id]}"
+
+        erb :report_parameters
       end
 
-      post '/run_rpt:id' do
-        #"PARAMS: #{params.inspect}"
-        # PARAMS: {"queryparam" => {"user_name"=>{"operator"=>"=", "value"=>"sd"}, "department_id"=>{"operator"=>"=", "value"=>"17"}, "created_by"=>{"operator"=>"=", "value"=>"hans"}, "created_at"=>{"operator"=>"<", "value"=>"2015-10-08"}}, "limit"=>"", "splat"=>[], "captures"=>["1"], "id"=>"1"}
-        #
+      # Return a grid with the report.
+      post '/run_rpt/:id' do
         # How to handle IN (n,n,n,n,n)...
         # qparam => {username =>{1=>{op,val},2=>{op,val}},department_id =>{1=>{op,val},2=>{op,val}},created_at=>{op=>"between",from=>"",to=>""}}
         #
@@ -237,17 +206,7 @@ module FloatingCanvas
         # validate if between chosen, must have from && to values... (should do this in the UI)
         # ------------------------
 
-        # fn = File.join(settings.dm_reports_location, '.dm_report_list.yml')
-        # report_dictionary = YAML.load_file(fn)
-        # this_report = report_dictionary[params[:id].to_i]
-        # yp = Dataminer::YamlPersistor.new(this_report[:file])
-        # rpt = Dataminer::Report.load(yp)
         @rpt = lookup_report(params[:id])
-        # repos = DmRepository.new
-        # rpt = repos.get_report(params[:id].to_i)
-        # yp = Dataminer::YamlPersistor.new('tst.yml')
-        # rpt = Dataminer::Report.load(yp)
-        # rpt = Dataminer::Report.create_from_hash(YAML.load(File.read('tst.yml')))
 
         in_params = params[:queryparam]
         parms = []
@@ -266,19 +225,11 @@ module FloatingCanvas
             #FIXME: param might not be part of returned columns - use param def to decide datatype.
             #- rpt has param defs & new params apply to them, BUT should allow for new params that do not relate to param defs
             #- when replacing WHERE with ID for e.g.
-            # opts = {:operator => rules['operator'], :value => rules['value'] || rules['from_value']}
-            #puts col.data_type
-            # if :integer == col && col.data_type
-            #   opts[:convert] = :to_i
-            # end
-            # dtype = :integer #col && col.data_type
             dtype = :string
             @rpt.query_parameter_definitions.each {|d| if d.column == field then dtype = d.data_type; end }
-            #parms << Dataminer::QueryParameter.new(pn, opts)
             parms << Dataminer::QueryParameter.new(pn, Dataminer::OperatorValue.new(rules['operator'], rules['value'] || rules['to_value'], dtype))
           end
         end
-        # puts parms.inspect
 
         @rpt.limit = params[:limit].to_i if params[:limit] != ''
         # rpt.offset = params[:offset].to_i if params[:offset] != ''
@@ -288,29 +239,84 @@ module FloatingCanvas
           return "ERROR: #{e.message}"
         end
 
+        @col_defs = []
+        @rpt.ordered_columns.each do | col|
+          hs                  = {headerName: col.caption, field: col.name, hide: col.hide, headerTooltip: col.caption}
+          hs[:width]          = col.width unless col.width.nil?
+          hs[:enableValue]    = true if [:integer, :number].include?(col.data_type)
+          hs[:enableRowGroup] = true unless hs[:enableValue]
+          if [:integer, :number].include?(col.data_type)
+            hs[:cellClass] = 'grid-number-column'
+            hs[:width]     = 100 if col.width.nil? && col.data_type == :integer
+            hs[:width]     = 120 if col.width.nil? && col.data_type == :number
+          end
+          if col.format == :delimited_1000
+            hs[:cellRenderer] = 'jmtGridFormatters.numberWithCommas2'
+          end
+          if col.format == :delimited_1000_4
+            hs[:cellRenderer] = 'jmtGridFormatters.numberWithCommas4'
+          end
+          if col.data_type == :boolean
+            hs[:cellRenderer] = 'jmtGridFormatters.booleanFormatter'
+            hs[:cellClass]    = 'grid-boolean-column'
+            hs[:width]        = 100 if col.width.nil?
+          end
 
-        #res = ActiveRecord::Base.connection.select_all(rpt.runnable_sql)
-        res = DB[@rpt.runnable_sql].all
+          hs[:cellClassRules] = {"grid-row-red": "x === 'Fred'"} if col.name == 'author'
 
-        tab = "<table border='1'><tr>#{@rpt.ordered_columns.map {|c| "<th>#{c.caption}</th>" }.join}</tr>"
-        res.each do |r|
-          tab << '<tr>'
-          @rpt.ordered_columns.each {|c| tab << "<td#{if c.data_type==:integer || c.data_type==:number then ' align="right"'; end}>#{r[c.name.to_sym]}</td>" }
-          tab << '</tr>'
+          @col_defs << hs
         end
-        tab << '</table>'
-        #pg = PgQuery.parse(rpt.runnable_sql)
-        # show_hide = %Q|
-        #   <a href="#" onclick="var post = document.getElementById('debug_info'); if(post.style.display === 'none') { post.style.display = 'block';} else {post.style.display = 'none';};return false">Show SQL and parse tree &#10162;</a>
-        #   <div id="debug_info" style="display : none;">
-        #   <p>#{pg.tree[0]}</p>LIMIT: #{rpt.limit}.
-        #   </div>|
 
+        @row_defs = DB[@rpt.runnable_sql].all
 
-        # "<h1>Report results &ndash; RESULT</h1>#{menu}<pre>#{sql_to_highlight(@rpt.runnable_sql)}</pre><hr>
-        # #{tab}"
-        # + "<h2>Columns</h2><table><tr><th>Name</th><th>Seq</th><th>Caption</th><th>Namespace</th></tr>#{rpt.columns.map {|c| "<tr><td>#{c.name}</td><td>#{c.sequence_no}</td><td>#{c.caption}</td><td>#{c.namespaced_name}</td></tr>" }.join("\n")}</table>"
         erb :report_display
+      end
+
+      get '/admin' do
+        # Need some kind of login verification.
+        # List reports for editing.
+        # Button to import old-style report.
+        # Button to create new report.
+        # "NOT YET WRITTEN..."
+        @rpt_list = DmReportLister.new(settings.dm_reports_location).get_report_list(from_cache: true)
+        erb :admin_index
+      end
+
+      post '/admin_convert' do
+        unless params[:file] &&
+               (tmpfile = params[:file][:tempfile]) &&
+               (name = params[:file][:filename])
+          return "No file selected"
+        end
+        yml = tmpfile.read
+        hash = YAML.load(yml)
+        <<-EOS
+        <h1>FILE: #{name}</h1>#{menu}
+        
+        <form action='/#{settings.url_prefix}set_sql' method=post>
+        <input type='hidden' name='filename' value='#{name}' />
+        <input type='hidden' name='temp_path' value='#{tmpfile.path}' />
+        SQL: <textarea name=sql rows=20 cols=120>#{clean_where(hash['query'])}</textarea>
+        <p><strong>NB</strong> remove all <em>column={column}</em> parts of the WHERE clause before converting.
+        <br>This code tries to do as much as possible, but you need to check the where clause - especially for stray "and"s.</p>
+        <br><input type='submit' />
+        </form>
+        <pre>#{yml}</pre>
+        EOS
+      end
+
+      post '/set_sql' do
+        yml = nil
+        File.open(params[:temp_path], 'r') {|f| yml = f.read }
+        hash = YAML.load(yml)
+        hash['query'] = params[:sql]
+        rpt = DmConverter.new(settings.dm_reports_location).convert_hash(hash, params[:filename])
+        # yp = Dataminer::YamlPersistor.new('report1.yml')
+        # rpt.save(yp)
+        <<-EOS
+        <h1>Converted</h1>#{menu}
+        <pre>#{rpt.to_hash.to_yaml}</pre>
+        EOS
       end
 
 

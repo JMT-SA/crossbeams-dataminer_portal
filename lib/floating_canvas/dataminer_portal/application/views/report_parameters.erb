@@ -1,0 +1,59 @@
+<!DOCTYPE html>
+<html lang="en-US" prefix="og: http://ogp.me/ns#">
+  <head>
+    <title>Report parameters</title>
+    <meta http-equiv="content-type" content="text/html;charset=utf-8" />
+    <meta name="generator" content="Geany 1.27" />
+    <meta name="viewport" content="width=device-width", initial-scale=1 /> <!-- IMPORTANT FOR MEDIA QUERIES TO WORK..... -->
+    <link rel="stylesheet" href="/stylesheets/flexbox_form.css">
+  </head>
+
+  <body>
+    <h1>Fill in parameters</h1>
+    <p>(If report has no params, only the LIMIT gets filled in)</p>
+    <%= @menu %>
+    <h2><%= @rpt.caption %></h2>
+
+    <form action='<%= @report_action %>' method=post>
+
+      <p><label>Limit: <input type="number" name='limit' min="1" /></label></p>
+
+      <% @qps.each do |qp| %>
+        <div class="field-group">
+          <label class="label"><%=qp.caption %></label>
+          <div class="field">
+            <select name="queryparam[<%=qp.column %>][operator]">
+              <% if qp.control_type == :list %>
+                <%= make_options(@ops_sel_ar)%>
+              <% elsif qp.control_type == :date %>
+                <%= make_options(@ops_date_ar)%>
+              <% else %>
+                <%= make_options(@ops_ar)%>
+              <% end %>
+            </select>
+            <% if qp.control_type == :list %>
+              <select name="queryparam[<%=qp.column %>][value]">
+                <option value=""></option>
+                <%= make_options(qp.build_list {|sql| DB[sql].all.map {|r| r.values } }.list_values) %>
+              </select>
+            <% elsif qp.control_type == :date %>
+              <input type="date" name="queryparam[<%=qp.column %>][from_value]" value="<%=qp.default_value %>" />
+              and
+              <input type="date" name="queryparam[<%=qp.column %>][to_value]" value="<%=qp.default_value %>" />
+            <% else %>
+              <input type="text" name="queryparam[<%=qp.column %>][value]" value="<%=qp.default_value %>" />
+            <% end %>
+          </div>
+        </div>
+
+      <% end %>
+      <div class="field-group">
+        <div class="field">
+          <input type=submit>
+        </div>
+      </div>
+    </form>
+
+  </body>
+
+</html>

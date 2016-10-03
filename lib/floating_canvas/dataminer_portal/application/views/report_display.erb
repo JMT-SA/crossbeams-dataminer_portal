@@ -1,16 +1,137 @@
 <html>
   <head>
     <title>Report</title>
+    <script src="/javascripts/ag-grid-enterprise.js" type="text/javascript"></script>
+    <script src="/javascripts/jmt-grid-loader.js" type="text/javascript"></script>
 </head>
 <body>
         <h1>Report results &ndash; RESULT</h1>
 <%= menu %>
 <pre><%= sql_to_highlight(@rpt.runnable_sql) %></pre><hr>
-<p>TODO: Show report in a grid...</p>
+<p>Here would be links to show SQL, conditions, link back to params, links to save as view etc....</p>
 <div class="container">
-	<div class="item1"></div>
-	<div class="item2"></div>
-	<div class="item3"></div>
+  <div class="item1"></div>
+  <div class="item2"></div>
+  <div class="item3"></div>
 </div>
+      <div style="height:40em">
+      <div class="grid-head">
+        <label style="margin-left: 20px;">
+          <button onclick="jmtGridEvents.csvExport('grd1', '<%= @rpt.caption.gsub(/[\/:*?"\\<>\|\r\n]/i, '-') %>.csv')">Export to CSV</button>
+        </label>
+        <label style="margin-left: 20px;">
+            <button onclick="jmtGridEvents.toggleToolPanel('grd1')">Tool panel</button>
+        </label>
+        <label style="margin-left: 20px;">
+            <input onkeyup="jmtGridEvents.quickSearch(event)" placeholder='Search...' data-grid-id="grd1"/>
+        </label>
+        <%= @rpt.caption %>
+      </div>
+        <div id="grd1" style="height: 100%;" class="ag-blue"></div>
+      </div>
+
+<script>
+
+(function() {
+  //var loadGrid;
+  var onBtExport;
+
+  translateColDefs = function(columnDefs) {
+    //console.log(columnDefs);
+    var newColDefs = [], col, newCol, fn;
+    for (_i = 0, _len = columnDefs.length; _i < _len; _i++) {
+      col = columnDefs[_i];
+      newCol = {};
+      for(attr in col) {
+        if(attr==='cellRenderer') {
+          //fn = window[col[attr]];
+          //newCol[attr] = fn;
+          //newCol[attr] = eval(col[attr]);
+          if(col[attr] ==='jmtGridFormatters.testRender') {
+            newCol[attr] = jmtGridFormatters.testRender;
+          }
+          if(col[attr] ==='jmtGridFormatters.numberWithCommas2') {
+            newCol[attr] = jmtGridFormatters.numberWithCommas2;
+          }
+          if(col[attr] ==='jmtGridFormatters.numberWithCommas4') {
+            newCol[attr] = jmtGridFormatters.numberWithCommas4;
+          }
+          if(col[attr] ==='jmtGridFormatters.booleanFormatter') {
+            newCol[attr] = jmtGridFormatters.booleanFormatter;
+          }
+          if(col[attr] ==='jmtGridFormatters.hrefInlineFormatter') {
+            newCol[attr] = jmtGridFormatters.hrefInlineFormatter;
+          }
+          if(col[attr] ==='jmtGridFormatters.hrefSimpleFormatter') {
+            newCol[attr] = jmtGridFormatters.hrefSimpleFormatter;
+          }
+          if(col[attr] ==='jmtGridFormatters.hrefPromptFormatter') {
+            newCol[attr] = jmtGridFormatters.hrefPromptFormatter;
+          }
+
+        }
+        else {
+          newCol[attr] = col[attr];
+        }
+      }
+      newColDefs.push(newCol);
+    }
+    return newColDefs;
+  };
+
+  // loadGrid = function(grid, gridOptions) {
+  //   var httpRequest, url;
+  //   url = grid.getAttribute('data-gridurl');
+  //   httpRequest = new XMLHttpRequest();
+  //   httpRequest.open('GET', url);
+  //   httpRequest.send();
+  //   return httpRequest.onreadystatechange = function() {
+  //     var httpResult, newColDefs;
+  //     if (httpRequest.readyState === 4 && httpRequest.status === 200) {
+  //       httpResult = JSON.parse(httpRequest.responseText);
+  //       newColDefs = translateColDefs(httpResult.columnDefs);
+  //       gridOptions.api.setColumnDefs(newColDefs);
+  //       gridOptions.api.setRowData(httpResult.rowDefs);
+  //     }
+  //   };
+  // };
+
+
+
+
+      var grid, gridOptions, grid_id, colDefs, rowDefs;
+  // colDefs = [{headerName:"",width:60,suppressMenu:true,suppresSorting:true,suppresMovable:true,suppresFilter:true,enableRowGroup:false,enablePivot:false,enableValue:false,suppressCsvExport:true,valueGetter:"'/books/' + data.id + '/edit|edit'",colId:"edit_link2",cellRenderer:jmtGridFormatters.hrefSimpleFormatter},
+  //         {headerName:"",width:60,suppressMenu:true,suppresSorting:true,suppresMovable:true,suppresFilter:true,enableRowGroup:false,enablePivot:false,enableValue:false,suppressCsvExport:true,valueGetter:"'/books/' + data.id + '|delete|Are you sure?'",colId:"delete_link",cellRenderer:jmtGridFormatters.hrefPromptFormatter},
+  //         {headerName:"Id",field:"id",hide:true,headerTooltip:"Id",enableValue:true,cellClass:"grid-number-column",width:100},
+  //         {headerName:"Title",field:"title",hide:false,headerTooltip:"Title",width:200,enableRowGroup:true},
+  //         {headerName:"Author",field:"author",hide:false,headerTooltip:"Author",width:150,enableRowGroup:true,cellClassRules:{"grid-row-red":"x === 'Fred'"}}];
+  colDefs = translateColDefs(<%= @col_defs.to_json %>),
+  rowDefs = <%= @row_defs.to_json %>,
+  // rowDefs = [{id:2,title:"Fred is Green, and Blue",author:"Fred"},
+  //                 {id:3,title:"A new book > Old book",author:"John"},
+  //                 {id:1,title:"TDD",author:"Kent Beck"},
+  //                 {id:5,title:"600980218299308328",author:"Pallet number"},
+  //                 {id:4,title:"Something",author:"Someones"}];
+      grid = document.querySelector('#grd1');
+      grid_id = grid.getAttribute('id');
+//console.log(grid_id);
+      //for_print = grid.dataset.gridPrint;
+      gridOptions = {
+        columnDefs: colDefs,
+        rowData: rowDefs,
+                enableColResize: true,
+                enableSorting: true,
+                enableFilter: true,
+                suppressScrollLag: true,
+                enableRangeSelection: true,
+                enableStatusBar: true,
+                suppressAggFuncInHeader: true
+              };
+
+      new agGrid.Grid(grid, gridOptions);
+      jmtGridStore.addGrid(grid_id, gridOptions);
+      //loadGrid(grid, gridOptions);
+  }).call(this);
+</script>
 </body>
 </html>

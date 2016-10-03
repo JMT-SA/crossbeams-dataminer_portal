@@ -1,0 +1,15 @@
+<h1>Admin</h1>
+  <h2>Convert a YAML report</h2>
+  <form action='/<%= the_url_prefix %>admin_convert' method=post enctype='multipart/form-data'>
+  Old YAML file:<br><input name='file' type='file' accept='.yml' />
+  <br><input type='submit' />
+  </form>
+
+<p>
+  Create new
+</p>
+<ol>
+  <% @rpt_list.each do |report| %>
+    <li><a href='/<%= the_url_prefix %>report/<%=report[:id] %>'>edit</a> <%= report[:caption] %></li>
+  <% end %>
+</ol>
