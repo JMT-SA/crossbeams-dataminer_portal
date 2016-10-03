@@ -119,7 +119,7 @@ module Crossbeams
       get '/index' do
         # TODO: sort report list, group, add tags etc...
 
-        rpt_list = DmReportLister.new(settings.dm_reports_location).get_report_list(true)
+        rpt_list = DmReportLister.new(settings.dm_reports_location).get_report_list(persist: true)
 
         <<-EOS
         <h1>Dataminer Reports</h1>
