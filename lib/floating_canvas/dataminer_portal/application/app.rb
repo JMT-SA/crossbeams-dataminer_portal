@@ -3,7 +3,7 @@ require 'sinatra'
 require 'sinatra/contrib'
 require 'sequel'
 
-module FloatingCanvas
+module Crossbeams
   module DataminerPortal
 
     class ConfigMerger

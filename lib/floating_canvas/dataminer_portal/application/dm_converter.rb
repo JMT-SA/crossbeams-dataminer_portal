@@ -1,4 +1,4 @@
-module FloatingCanvas
+module Crossbeams
   module DataminerPortal
 
     class DmConverter

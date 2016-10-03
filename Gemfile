@@ -1,6 +1,6 @@
 source 'https://rubygems.org'
 
-# Specify your gem's dependencies in floating_canvas-dataminer_portal.gemspec
+# Specify your gem's dependencies in crossbeams-dataminer_portal.gemspec
 gemspec
 
 # While testing DM:
