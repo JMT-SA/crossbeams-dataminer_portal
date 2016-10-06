@@ -27,9 +27,7 @@ module Crossbeams
       def make_list(from_cache)
         @report_lookup  = {}
         if from_cache
-          cached_report_hash.keys.sort.each do |id|
-            @report_lookup[id] = { file: yml_file, caption: Dataminer::Report.load(yp).caption }
-          end
+          @report_lookup = YAML.load_file(File.join(path, '.dm_report_list.yml'))
         else
           ymlfiles = File.join(path, "**", "*.yml")
           yml_list = Dir.glob( ymlfiles )

@@ -1,0 +1,35 @@
+.content-target {
+  min-height: 150px; }
+
+.content-loading {
+  background: transparent url(loading_bars.gif) 0 0 no-repeat; }
+
+section.jmt_layout {
+  border-bottom: gray thin solid; }
+
+.grid-number-column {
+  text-align: right; }
+
+.grid-boolean-column {
+  text-align: center; }
+
+.grid-row-red {
+  color: red;
+  background-color: yellow;
+  text-align: right; }
+
+.ac_icon, .ac_icon_uncheck, .ac_icon_check {
+  width: 16px;
+  height: 16px;
+  vertical-align: middle;
+  background-repeat: no-repeat;
+  display: inline-block;
+  padding-right: 4px; }
+
+.ac_icon_uncheck {
+  background-image: url(checkbox.png);
+  background-position: -50px -4px; }
+
+.ac_icon_check {
+  background-image: url(checkbox.png);
+  background-position: -25px -4px; }

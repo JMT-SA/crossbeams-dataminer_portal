@@ -4,3 +4,5 @@ database:
   user: postgres
   password: postgres
 dm_reports_location: dm_yml_reports
+dm_js_location: javascripts
+dm_css_location: stylesheets

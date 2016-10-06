@@ -60,18 +60,14 @@ module Crossbeams
         width = 120
         ar = sql.gsub(/from /i, "\nFROM ").gsub(/where /i, "\nWHERE ").gsub(/(left outer join |left join |inner join |join )/i, "\n\\1").split("\n")
         wrapped_sql = ar.map {|a| a.scan(/\S.{0,#{width-2}}\S(?=\s|$)|\S+/).join("\n") }.join("\n")
-        # wrapped_sql = sql.scan(/\S.{0,#{width-2}}\S(?=\s|$)|\S+/).join("\n")
-        # opts = {:css_class    => nil,
-        #         :inline_theme => 'github',
-        #         :line_numbers => false}
 
         theme = Rouge::Themes::Github.new
         formatter = Rouge::Formatters::HTMLInline.new(theme)
-        #lexer  = Rouge::Lexer.find('sql')
         lexer  = Rouge::Lexers::SQL.new
         formatter.format(lexer.lex(wrapped_sql))
       end
 
+      # TODO: Change this to work from filenames.
       def lookup_report(id)
         DmReportLister.new(settings.dm_reports_location).get_report_by_id(id)
       end
@@ -104,8 +100,9 @@ module Crossbeams
           settings.url_prefix
         end
 
-        def menu
-          "<p><a href='/#{settings.url_prefix}index'>Return to report index</a></p>"
+        def menu(with_admin=false)
+          admin_menu = with_admin ? "<p><a href='/#{settings.url_prefix}admin'>Return to admin index</a></p>" : ''
+          "<p><a href='/#{settings.url_prefix}index'>Return to report index</a></p>#{admin_menu}"
         end
       end
 
@@ -208,7 +205,7 @@ module Crossbeams
 
         @rpt = lookup_report(params[:id])
 
-        in_params = params[:queryparam]
+        in_params = params[:queryparam] || []
         parms = []
         in_params.each do |field,rules|
           col = @rpt.column(field)
@@ -244,7 +241,7 @@ module Crossbeams
           hs                  = {headerName: col.caption, field: col.name, hide: col.hide, headerTooltip: col.caption}
           hs[:width]          = col.width unless col.width.nil?
           hs[:enableValue]    = true if [:integer, :number].include?(col.data_type)
-          hs[:enableRowGroup] = true unless hs[:enableValue]
+          hs[:enableRowGroup] = true unless hs[:enableValue] && !col.groupable
           if [:integer, :number].include?(col.data_type)
             hs[:cellClass] = 'grid-number-column'
             hs[:width]     = 100 if col.width.nil? && col.data_type == :integer
@@ -267,9 +264,14 @@ module Crossbeams
           @col_defs << hs
         end
 
-        @row_defs = DB[@rpt.runnable_sql].all
+        begin
+          # Use module for BigDecimal change? - register_extension...?
+          @row_defs = DB[@rpt.runnable_sql].to_a.map {|m| m.keys.each {|k| if m[k].is_a?(BigDecimal) then m[k] = m[k].to_f; end }; m; }
 
-        erb :report_display
+          erb :report_display
+        rescue Sequel::DatabaseError => e
+          "#{menu}<p style='color:red;'>There is a problem with the SQL definition of this report:<p><p>Report: <em>#{@rpt.caption}</em></p>The error message is: <pre>#{e.message}</pre>"
+        end
       end
 
       get '/admin' do
@@ -292,8 +294,8 @@ module Crossbeams
         hash = YAML.load(yml)
         <<-EOS
         <h1>FILE: #{name}</h1>#{menu}
-        
-        <form action='/#{settings.url_prefix}set_sql' method=post>
+
+        <form action='/#{settings.url_prefix}admin_save_conversion' method=post>
         <input type='hidden' name='filename' value='#{name}' />
         <input type='hidden' name='temp_path' value='#{tmpfile.path}' />
         SQL: <textarea name=sql rows=20 cols=120>#{clean_where(hash['query'])}</textarea>
@@ -305,7 +307,7 @@ module Crossbeams
         EOS
       end
 
-      post '/set_sql' do
+      post '/admin_save_conversion' do
         yml = nil
         File.open(params[:temp_path], 'r') {|f| yml = f.read }
         hash = YAML.load(yml)
@@ -319,6 +321,99 @@ module Crossbeams
         EOS
       end
 
+      get '/admin_new' do
+        @filename=''
+        @caption=''
+        @sql=''
+        @err=''
+        erb :admin_new
+      end
+
+      post '/admin_create' do
+        #@filename = params[:filename].trim.downcase.gsub(' ', '_').gsub(/_+/, '_')
+        # Ensure the filename:
+        # * is lowercase
+        # * has spaces converted to underscores
+        # * more than one underscore in a row becomes one
+        # * the name ends in ".yml"
+        s = params[:filename].strip.downcase.gsub(' ', '_').gsub(/_+/, '_')
+        @filename = File.basename(s).reverse.sub(File.extname(s).reverse, '').reverse << '.yml'
+        @caption  = params[:caption]
+        @sql      = params[:sql]
+        @err      = ''
+
+        @rpt = Dataminer::Report.new(@caption)
+        begin
+          @rpt.sql = @sql
+        rescue StandardError => e
+          @err = e.message
+        end
+        # Check for existing file name...
+        if File.exists?(File.join(settings.dm_reports_location, @filename))
+          @err = 'A file with this name already exists'
+        end
+        # Write file, rebuild index and go to edit...
+
+        if @err.empty?
+          # run the report with limit 1 and set up datatypes etc.
+          DmCreator.new(DB, @rpt).modify_column_dtattypes
+          yp = Dataminer::YamlPersistor.new(File.join(settings.dm_reports_location, @filename))
+          @rpt.save(yp)
+          DmReportLister.new(settings.dm_reports_location).get_report_list(persist: true) # Kludge to ensure list is rebuilt... (stuffs up anyone else running reports if id changes....)
+
+          erb(<<-EOS)
+          <h1>Saved file...got to admin index and edit...</h1>#{menu(true)}
+          <p>Filename: <em><%= @filename %></em></p>
+          <p>Caption: <em><%= @rpt.caption %></em></p>
+          <p>SQL: <em><%= @rpt.runnable_sql %></em></p>
+          <p>Columns:<br><% @rpt.columns.each do | column| %>
+            <p><%= column %></p>
+          <% end %>
+          </p>
+          EOS
+        else
+          erb :admin_new
+        end
+      end
+
+      get '/admin_edit/:id' do
+        @rpt = lookup_report(params[:id])
+
+        @col_defs = [{headerName: 'Column Name', field: 'name'},
+                     {headerName: 'Sequence', field: 'sequence_no', cellClass: 'grid-number-column'},
+                     {headerName: 'Caption', field: 'caption'},
+                     {headerName: 'Namespaced Name', field: 'namespaced_name'},
+                     {headerName: 'Data type', field: 'data_type'},
+                     {headerName: 'Width', field: 'width', cellClass: 'grid-number-column'},
+                     {headerName: 'Format', field: 'format'},
+                     #{headerName: 'Hide?', field: 'hide'},
+                     {headerName: 'Hide?', field: 'hide', cellRenderer: 'jmtGridFormatters.booleanFormatter', cellClass: 'grid-boolean-column'},
+                     {headerName: 'Can group by?', field: 'groupable', cellRenderer: 'jmtGridFormatters.booleanFormatter', cellClass: 'grid-boolean-column'},
+                     {headerName: 'Group Seq', field: 'group_by_seq', cellClass: 'grid-number-column', headerTooltip: 'If the grid opens grouped, this is the grouping level'},
+                     {headerName: 'Sum?', field: 'group_sum', cellRenderer: 'jmtGridFormatters.booleanFormatter', cellClass: 'grid-boolean-column'},
+                     {headerName: 'Avg?', field: 'group_avg', cellRenderer: 'jmtGridFormatters.booleanFormatter', cellClass: 'grid-boolean-column'},
+                     {headerName: 'Min?', field: 'group_min', cellRenderer: 'jmtGridFormatters.booleanFormatter', cellClass: 'grid-boolean-column'},
+                     {headerName: 'Max?', field: 'group_max', cellRenderer: 'jmtGridFormatters.booleanFormatter', cellClass: 'grid-boolean-column'}
+        ]
+        @row_defs = @rpt.ordered_columns.map {|c| c.to_hash }
+
+        @col_defs_params = [
+          {headerName: 'Column', field: 'column'},
+          {headerName: 'Caption', field: 'caption'},
+          {headerName: 'Data type', field: 'data_type'},
+          {headerName: 'Control type', field: 'control_type'},
+          {headerName: 'List definition', field: 'list_def'},
+          {headerName: 'UI priority', field: 'ui_priority'},
+          {headerName: 'Default value', field: 'default_value'}#,
+          #{headerName: 'List values', field: 'list_values'}
+        ]
+
+        @row_defs_params = []
+        @rpt.query_parameter_definitions.each do |query_def|
+          @row_defs_params << query_def.to_hash
+        end
+        erb :admin_edit
+      end
 
       get '/test_page' do
         erb :test
