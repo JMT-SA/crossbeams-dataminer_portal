@@ -4,7 +4,7 @@ require "crossbeams/dataminer_portal/application//dm_report_lister.rb"
 require "crossbeams/dataminer_portal/application//dm_converter.rb"
 require "crossbeams/dataminer_portal/application//dm_creator.rb"
 
-require 'dataminer'
+require 'crossbeams/dataminer'
 require 'rouge'
 
 module Crossbeams

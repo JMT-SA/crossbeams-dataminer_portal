@@ -128,8 +128,8 @@ module Crossbeams
         # fn = File.join(settings.dm_reports_location, '.dm_report_list.yml')
         # report_dictionary = YAML.load_file(fn)
         # this_report = report_dictionary[params[:id].to_i]
-        # yp = Dataminer::YamlPersistor.new(this_report[:file])
-        # @rpt = Dataminer::Report.load(yp)
+        # yp = Crossbeams::Dataminer::YamlPersistor.new(this_report[:file])
+        # @rpt = Crossbeams::Dataminer::Report.load(yp)
         @rpt = lookup_report(params[:id])
 
         # repos = DmRepository.new
@@ -213,8 +213,8 @@ module Crossbeams
           #puts col && col.data_type
           if 'between' == rules['operator']
             unless rules['from_value'] == '' && rules['to_value'] == ''
-              # parms << Dataminer::QueryParameter.new(pn, :operator => rules['operator'], :from_value => rules['from_value'], :to_value => rules['to_value'])
-              parms << Dataminer::QueryParameter.new(pn, Dataminer::OperatorValue.new(rules['operator'], [rules['from_value'], rules['to_value']]))
+              # parms << Crossbeams::Dataminer::QueryParameter.new(pn, :operator => rules['operator'], :from_value => rules['from_value'], :to_value => rules['to_value'])
+              parms << Crossbeams::Dataminer::QueryParameter.new(pn, Crossbeams::Dataminer::OperatorValue.new(rules['operator'], [rules['from_value'], rules['to_value']]))
             end
           else
             next if rules['value'] == '' && rules['operator'] != 'is_null' && rules['operator'] != 'not_null'
@@ -224,7 +224,7 @@ module Crossbeams
             #- when replacing WHERE with ID for e.g.
             dtype = :string
             @rpt.query_parameter_definitions.each {|d| if d.column == field then dtype = d.data_type; end }
-            parms << Dataminer::QueryParameter.new(pn, Dataminer::OperatorValue.new(rules['operator'], rules['value'] || rules['to_value'], dtype))
+            parms << Crossbeams::Dataminer::QueryParameter.new(pn, Crossbeams::Dataminer::OperatorValue.new(rules['operator'], rules['value'] || rules['to_value'], dtype))
           end
         end
 
@@ -313,7 +313,7 @@ module Crossbeams
         hash = YAML.load(yml)
         hash['query'] = params[:sql]
         rpt = DmConverter.new(settings.dm_reports_location).convert_hash(hash, params[:filename])
-        # yp = Dataminer::YamlPersistor.new('report1.yml')
+        # yp = Crossbeams::Dataminer::YamlPersistor.new('report1.yml')
         # rpt.save(yp)
         <<-EOS
         <h1>Converted</h1>#{menu}
@@ -342,7 +342,7 @@ module Crossbeams
         @sql      = params[:sql]
         @err      = ''
 
-        @rpt = Dataminer::Report.new(@caption)
+        @rpt = Crossbeams::Dataminer::Report.new(@caption)
         begin
           @rpt.sql = @sql
         rescue StandardError => e
@@ -357,7 +357,7 @@ module Crossbeams
         if @err.empty?
           # run the report with limit 1 and set up datatypes etc.
           DmCreator.new(DB, @rpt).modify_column_dtattypes
-          yp = Dataminer::YamlPersistor.new(File.join(settings.dm_reports_location, @filename))
+          yp = Crossbeams::Dataminer::YamlPersistor.new(File.join(settings.dm_reports_location, @filename))
           @rpt.save(yp)
           DmReportLister.new(settings.dm_reports_location).get_report_list(persist: true) # Kludge to ensure list is rebuilt... (stuffs up anyone else running reports if id changes....)
 
@@ -380,20 +380,37 @@ module Crossbeams
         @rpt = lookup_report(params[:id])
 
         @col_defs = [{headerName: 'Column Name', field: 'name'},
-                     {headerName: 'Sequence', field: 'sequence_no', cellClass: 'grid-number-column'},
-                     {headerName: 'Caption', field: 'caption'},
+                     {headerName: 'Sequence', field: 'sequence_no', cellClass: 'grid-number-column'}, # to be changed in group...
+                     {headerName: 'Caption', field: 'caption', editable: true},
                      {headerName: 'Namespaced Name', field: 'namespaced_name'},
-                     {headerName: 'Data type', field: 'data_type'},
-                     {headerName: 'Width', field: 'width', cellClass: 'grid-number-column'},
-                     {headerName: 'Format', field: 'format'},
-                     #{headerName: 'Hide?', field: 'hide'},
-                     {headerName: 'Hide?', field: 'hide', cellRenderer: 'crossbeamsGridFormatters.booleanFormatter', cellClass: 'grid-boolean-column'},
-                     {headerName: 'Can group by?', field: 'groupable', cellRenderer: 'crossbeamsGridFormatters.booleanFormatter', cellClass: 'grid-boolean-column'},
-                     {headerName: 'Group Seq', field: 'group_by_seq', cellClass: 'grid-number-column', headerTooltip: 'If the grid opens grouped, this is the grouping level'},
-                     {headerName: 'Sum?', field: 'group_sum', cellRenderer: 'crossbeamsGridFormatters.booleanFormatter', cellClass: 'grid-boolean-column'},
-                     {headerName: 'Avg?', field: 'group_avg', cellRenderer: 'crossbeamsGridFormatters.booleanFormatter', cellClass: 'grid-boolean-column'},
-                     {headerName: 'Min?', field: 'group_min', cellRenderer: 'crossbeamsGridFormatters.booleanFormatter', cellClass: 'grid-boolean-column'},
-                     {headerName: 'Max?', field: 'group_max', cellRenderer: 'crossbeamsGridFormatters.booleanFormatter', cellClass: 'grid-boolean-column'}
+                     {headerName: 'Data type', field: 'data_type', editable: true, cellEditor: 'select', cellEditorParams: {
+                       values: ['string', 'integer', 'number', 'date', 'datetime']
+                     }},
+                     {headerName: 'Width', field: 'width', cellClass: 'grid-number-column', editable: true, cellEditor: 'NumericCellEditor'}, # editable NUM ONLY...
+                     {headerName: 'Format', field: 'format', editable: true, cellEditor: 'select', cellEditorParams: {
+                       values: ['', 'delimited_1000', 'delimited_1000_4']
+                     }},
+                     {headerName: 'Hide?', field: 'hide', cellRenderer: 'crossbeamsGridFormatters.booleanFormatter', cellClass: 'grid-boolean-column', editable: true, cellEditor: 'select', cellEditorParams: {
+                       values: [true, false]
+                     }},
+                     {headerName: 'Can group by?', field: 'groupable', cellRenderer: 'crossbeamsGridFormatters.booleanFormatter', cellClass: 'grid-boolean-column', editable: true, cellEditor: 'select', cellEditorParams: {
+                       values: [true, false]
+                     }},
+                     {headerName: 'Group Seq', field: 'group_by_seq', cellClass: 'grid-number-column', headerTooltip: 'If the grid opens grouped, this is the grouping level', editable: true, cellEditor: 'select', cellEditorParams: {
+                       values: [true, false]
+                     }},
+                     {headerName: 'Sum?', field: 'group_sum', cellRenderer: 'crossbeamsGridFormatters.booleanFormatter', cellClass: 'grid-boolean-column', editable: true, cellEditor: 'select', cellEditorParams: {
+                       values: [true, false]
+                     }},
+                     {headerName: 'Avg?', field: 'group_avg', cellRenderer: 'crossbeamsGridFormatters.booleanFormatter', cellClass: 'grid-boolean-column', editable: true, cellEditor: 'select', cellEditorParams: {
+                       values: [true, false]
+                     }},
+                     {headerName: 'Min?', field: 'group_min', cellRenderer: 'crossbeamsGridFormatters.booleanFormatter', cellClass: 'grid-boolean-column', editable: true, cellEditor: 'select', cellEditorParams: {
+                       values: [true, false]
+                     }},
+                     {headerName: 'Max?', field: 'group_max', cellRenderer: 'crossbeamsGridFormatters.booleanFormatter', cellClass: 'grid-boolean-column', editable: true, cellEditor: 'select', cellEditorParams: {
+                       values: [true, false]
+                     }}
         ]
         @row_defs = @rpt.ordered_columns.map {|c| c.to_hash }
 
@@ -412,7 +429,33 @@ module Crossbeams
         @rpt.query_parameter_definitions.each do |query_def|
           @row_defs_params << query_def.to_hash
         end
+        @save_url = "/#{settings.url_prefix}save_param_grid_col/#{params[:id]}"
         erb :admin_edit
+      end
+
+      #TODO: On validation failure, return error message.
+      #      - change JS to display msg on error.
+      #      - Make JS scoped by crossbeams.
+      #      - split editors into another JS file
+      #      - ditto formatters etc...
+      post '/save_param_grid_col/:id' do
+        @rpt = lookup_report(params[:id])
+        col = @rpt.columns[params[:key_val]]
+        attrib = params[:col_name]
+        value  = params[:col_val]
+        value  = nil if value.strip == ''
+        # Should validate - width numeric, range... caption cannot be blank...
+        # FIXME: width must be saved as integer.....
+        if ['format', 'data_type'].include?(attrib) && !value.nil?
+          col.send("#{attrib}=", value.to_sym)
+        else
+          col.send("#{attrib}=", value)
+        end
+
+        filename = DmReportLister.new(settings.dm_reports_location).get_file_name_by_id(params[:id])
+        yp = Crossbeams::Dataminer::YamlPersistor.new(filename)
+        @rpt.save(yp)
+        "Changed #{attrib} for #{params[:key_val]}"
       end
 
       get '/test_page' do

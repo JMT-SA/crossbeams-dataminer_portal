@@ -20,7 +20,7 @@ module Crossbeams
         grouped_fields = [] if !grid_configs['grouped']
         fields = hash['fields'] || {}
 
-        rpt = Dataminer::Report.new(grid_configs['caption'] || 'Unknown report')
+        rpt = Crossbeams::Dataminer::Report.new(grid_configs['caption'] || 'Unknown report')
         rpt.sql = hash['query']
         rpt.ordered_columns.each do | column|
           if grid_configs['column_widths'] && grid_configs['column_widths'][column.name]
@@ -75,7 +75,7 @@ module Crossbeams
               data_type = column.data_type
             end
           end
-          rpt.add_parameter_definition( Dataminer::QueryParameterDefinition.new(param_name,
+          rpt.add_parameter_definition( Crossbeams::Dataminer::QueryParameterDefinition.new(param_name,
                                                                   :caption       => caption,
                                                                   :data_type     => data_type,
                                                                   :control_type  => control_type,
@@ -83,7 +83,7 @@ module Crossbeams
                                                                   :default_value => nil,
                                                                   :list_def      => list_def))
         end
-        yp = Dataminer::YamlPersistor.new(File.join(path, name))
+        yp = Crossbeams::Dataminer::YamlPersistor.new(File.join(path, name))
         rpt.save(yp)
         rpt
       end

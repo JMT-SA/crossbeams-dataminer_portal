@@ -4,4 +4,4 @@ source 'https://rubygems.org'
 gemspec
 
 # While testing DM:
-gem 'dataminer', path: '/home/james/ra/dm_tests/dataminer'
+gem 'crossbeams-dataminer', path: '/home/james/ra/crossbeams/crossbeams-dataminer'

@@ -11,8 +11,15 @@ module Crossbeams
         config_file       = File.join(path, '.dm_report_list.yml')
         report_dictionary = YAML.load_file(config_file)
         this_report       = report_dictionary[id.to_i]
-        persistor         = Dataminer::YamlPersistor.new(this_report[:file])
-        Dataminer::Report.load(persistor)
+        persistor         = Crossbeams::Dataminer::YamlPersistor.new(this_report[:file])
+        Crossbeams::Dataminer::Report.load(persistor)
+      end
+
+      def get_file_name_by_id(id)
+        config_file       = File.join(path, '.dm_report_list.yml')
+        report_dictionary = YAML.load_file(config_file)
+        this_report       = report_dictionary[id.to_i]
+        this_report[:file]
       end
 
       def get_report_list(options = {from_cache: false, persist: false})
@@ -33,8 +40,8 @@ module Crossbeams
           yml_list = Dir.glob( ymlfiles )
 
           yml_list.each_with_index do |yml_file, index|
-            yp = Dataminer::YamlPersistor.new(yml_file)
-            @report_lookup[index] = { file: yml_file, caption: Dataminer::Report.load(yp).caption }
+            yp = Crossbeams::Dataminer::YamlPersistor.new(yml_file)
+            @report_lookup[index] = { file: yml_file, caption: Crossbeams::Dataminer::Report.load(yp).caption }
           end
         end
       end
