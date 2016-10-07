@@ -2,9 +2,9 @@
   <head>
     <title>Edit Report</title>
     <script src="/<%= settings.dm_js_location %>/ag-grid-enterprise.js" type="text/javascript"></script>
-    <script src="/<%= settings.dm_js_location %>/jmt-grid-loader.js" type="text/javascript"></script>
+    <script src="/<%= settings.dm_js_location %>/crossbeams-grid-loader.js" type="text/javascript"></script>
     <script src="/<%= settings.dm_js_location %>/crossbeams_utils.js" type="text/javascript"></script>
-    <link rel="stylesheet" href="/stylesheets/jmt_layout.css">
+    <link rel="stylesheet" href="/stylesheets/crossbeams-layout.css">
 </head>
 <body>
 <h1>Edit report</h1>
@@ -25,13 +25,13 @@ no pivot, other global grid options...
 <div style="height:20em">
   <div class="grid-head">
     <label style="margin-left: 20px;">
-      <button onclick="jmtGridEvents.csvExport('grd1', '<%= @rpt.caption.gsub(/[\/:*?"\\<>\|\r\n]/i, '-') %> columns.csv')">Export to CSV</button>
+      <button onclick="crossbeamsGridEvents.csvExport('grd1', '<%= @rpt.caption.gsub(/[\/:*?"\\<>\|\r\n]/i, '-') %> columns.csv')">Export to CSV</button>
     </label>
     <label style="margin-left: 20px;">
-      <button onclick="jmtGridEvents.toggleToolPanel('grd1')">Tool panel</button>
+      <button onclick="crossbeamsGridEvents.toggleToolPanel('grd1')">Tool panel</button>
     </label>
     <label style="margin-left: 20px;">
-      <input onkeyup="jmtGridEvents.quickSearch(event)" placeholder='Search...' data-grid-id="grd1"/>
+      <input onkeyup="crossbeamsGridEvents.quickSearch(event)" placeholder='Search...' data-grid-id="grd1"/>
     </label>
     <%= @rpt.caption %>
   </div>
@@ -42,13 +42,13 @@ no pivot, other global grid options...
 <div style="height:20em">
   <div class="grid-head">
     <label style="margin-left: 20px;">
-      <button onclick="jmtGridEvents.csvExport('grd2', '<%= @rpt.caption.gsub(/[\/:*?"\\<>\|\r\n]/i, '-') %> parameters.csv')">Export to CSV</button>
+      <button onclick="crossbeamsGridEvents.csvExport('grd2', '<%= @rpt.caption.gsub(/[\/:*?"\\<>\|\r\n]/i, '-') %> parameters.csv')">Export to CSV</button>
     </label>
     <label style="margin-left: 20px;">
-      <button onclick="jmtGridEvents.toggleToolPanel('grd2')">Tool panel</button>
+      <button onclick="crossbeamsGridEvents.toggleToolPanel('grd2')">Tool panel</button>
     </label>
     <label style="margin-left: 20px;">
-      <input onkeyup="jmtGridEvents.quickSearch(event)" placeholder='Search...' data-grid-id="grd2"/>
+      <input onkeyup="crossbeamsGridEvents.quickSearch(event)" placeholder='Search...' data-grid-id="grd2"/>
     </label>
     <%= @rpt.caption %>
   </div>
@@ -73,26 +73,26 @@ no pivot, other global grid options...
           //fn = window[col[attr]];
           //newCol[attr] = fn;
           //newCol[attr] = eval(col[attr]);
-          if(col[attr] ==='jmtGridFormatters.testRender') {
-            newCol[attr] = jmtGridFormatters.testRender;
+          if(col[attr] ==='crossbeamsGridFormatters.testRender') {
+            newCol[attr] = crossbeamsGridFormatters.testRender;
           }
-          if(col[attr] ==='jmtGridFormatters.numberWithCommas2') {
-            newCol[attr] = jmtGridFormatters.numberWithCommas2;
+          if(col[attr] ==='crossbeamsGridFormatters.numberWithCommas2') {
+            newCol[attr] = crossbeamsGridFormatters.numberWithCommas2;
           }
-          if(col[attr] ==='jmtGridFormatters.numberWithCommas4') {
-            newCol[attr] = jmtGridFormatters.numberWithCommas4;
+          if(col[attr] ==='crossbeamsGridFormatters.numberWithCommas4') {
+            newCol[attr] = crossbeamsGridFormatters.numberWithCommas4;
           }
-          if(col[attr] ==='jmtGridFormatters.booleanFormatter') {
-            newCol[attr] = jmtGridFormatters.booleanFormatter;
+          if(col[attr] ==='crossbeamsGridFormatters.booleanFormatter') {
+            newCol[attr] = crossbeamsGridFormatters.booleanFormatter;
           }
-          if(col[attr] ==='jmtGridFormatters.hrefInlineFormatter') {
-            newCol[attr] = jmtGridFormatters.hrefInlineFormatter;
+          if(col[attr] ==='crossbeamsGridFormatters.hrefInlineFormatter') {
+            newCol[attr] = crossbeamsGridFormatters.hrefInlineFormatter;
           }
-          if(col[attr] ==='jmtGridFormatters.hrefSimpleFormatter') {
-            newCol[attr] = jmtGridFormatters.hrefSimpleFormatter;
+          if(col[attr] ==='crossbeamsGridFormatters.hrefSimpleFormatter') {
+            newCol[attr] = crossbeamsGridFormatters.hrefSimpleFormatter;
           }
-          if(col[attr] ==='jmtGridFormatters.hrefPromptFormatter') {
-            newCol[attr] = jmtGridFormatters.hrefPromptFormatter;
+          if(col[attr] ==='crossbeamsGridFormatters.hrefPromptFormatter') {
+            newCol[attr] = crossbeamsGridFormatters.hrefPromptFormatter;
           }
 
         }
@@ -126,7 +126,7 @@ no pivot, other global grid options...
               };
 
       new agGrid.Grid(grid, gridOptions);
-      jmtGridStore.addGrid(grid_id, gridOptions);
+      crossbeamsGridStore.addGrid(grid_id, gridOptions);
 
       colDefs = translateColDefs(<%= @col_defs_params.to_json %>),
       rowDefs = <%= @row_defs_params.to_json %>,
@@ -147,7 +147,7 @@ no pivot, other global grid options...
               };
 
       new agGrid.Grid(grid, gridOptions);
-      jmtGridStore.addGrid(grid_id, gridOptions);
+      crossbeamsGridStore.addGrid(grid_id, gridOptions);
 
       //loadGrid(grid, gridOptions);
   }).call(this);

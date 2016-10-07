@@ -248,13 +248,13 @@ module Crossbeams
             hs[:width]     = 120 if col.width.nil? && col.data_type == :number
           end
           if col.format == :delimited_1000
-            hs[:cellRenderer] = 'jmtGridFormatters.numberWithCommas2'
+            hs[:cellRenderer] = 'crossbeamsGridFormatters.numberWithCommas2'
           end
           if col.format == :delimited_1000_4
-            hs[:cellRenderer] = 'jmtGridFormatters.numberWithCommas4'
+            hs[:cellRenderer] = 'crossbeamsGridFormatters.numberWithCommas4'
           end
           if col.data_type == :boolean
-            hs[:cellRenderer] = 'jmtGridFormatters.booleanFormatter'
+            hs[:cellRenderer] = 'crossbeamsGridFormatters.booleanFormatter'
             hs[:cellClass]    = 'grid-boolean-column'
             hs[:width]        = 100 if col.width.nil?
           end
@@ -387,13 +387,13 @@ module Crossbeams
                      {headerName: 'Width', field: 'width', cellClass: 'grid-number-column'},
                      {headerName: 'Format', field: 'format'},
                      #{headerName: 'Hide?', field: 'hide'},
-                     {headerName: 'Hide?', field: 'hide', cellRenderer: 'jmtGridFormatters.booleanFormatter', cellClass: 'grid-boolean-column'},
-                     {headerName: 'Can group by?', field: 'groupable', cellRenderer: 'jmtGridFormatters.booleanFormatter', cellClass: 'grid-boolean-column'},
+                     {headerName: 'Hide?', field: 'hide', cellRenderer: 'crossbeamsGridFormatters.booleanFormatter', cellClass: 'grid-boolean-column'},
+                     {headerName: 'Can group by?', field: 'groupable', cellRenderer: 'crossbeamsGridFormatters.booleanFormatter', cellClass: 'grid-boolean-column'},
                      {headerName: 'Group Seq', field: 'group_by_seq', cellClass: 'grid-number-column', headerTooltip: 'If the grid opens grouped, this is the grouping level'},
-                     {headerName: 'Sum?', field: 'group_sum', cellRenderer: 'jmtGridFormatters.booleanFormatter', cellClass: 'grid-boolean-column'},
-                     {headerName: 'Avg?', field: 'group_avg', cellRenderer: 'jmtGridFormatters.booleanFormatter', cellClass: 'grid-boolean-column'},
-                     {headerName: 'Min?', field: 'group_min', cellRenderer: 'jmtGridFormatters.booleanFormatter', cellClass: 'grid-boolean-column'},
-                     {headerName: 'Max?', field: 'group_max', cellRenderer: 'jmtGridFormatters.booleanFormatter', cellClass: 'grid-boolean-column'}
+                     {headerName: 'Sum?', field: 'group_sum', cellRenderer: 'crossbeamsGridFormatters.booleanFormatter', cellClass: 'grid-boolean-column'},
+                     {headerName: 'Avg?', field: 'group_avg', cellRenderer: 'crossbeamsGridFormatters.booleanFormatter', cellClass: 'grid-boolean-column'},
+                     {headerName: 'Min?', field: 'group_min', cellRenderer: 'crossbeamsGridFormatters.booleanFormatter', cellClass: 'grid-boolean-column'},
+                     {headerName: 'Max?', field: 'group_max', cellRenderer: 'crossbeamsGridFormatters.booleanFormatter', cellClass: 'grid-boolean-column'}
         ]
         @row_defs = @rpt.ordered_columns.map {|c| c.to_hash }
 
