@@ -1,4 +1,4 @@
-#TODO: This should probably be changed to use Sinatra::Base so that Object is not poulted with Sinatra methods...
+#TODO: This should probably be changed to use Sinatra::Base so that Object is not poluted with Sinatra methods...
 require 'sinatra'
 require 'sinatra/contrib'
 require 'sequel'
@@ -284,7 +284,7 @@ module Crossbeams
         erb :admin_index
       end
 
-      post '/admin_convert' do
+      post '/admin/convert' do
         unless params[:file] &&
                (tmpfile = params[:file][:tempfile]) &&
                (name = params[:file][:filename])
@@ -295,7 +295,7 @@ module Crossbeams
         <<-EOS
         <h1>FILE: #{name}</h1>#{menu}
 
-        <form action='/#{settings.url_prefix}admin_save_conversion' method=post>
+        <form action='/#{settings.url_prefix}admin/save_conversion' method=post>
         <input type='hidden' name='filename' value='#{name}' />
         <input type='hidden' name='temp_path' value='#{tmpfile.path}' />
         SQL: <textarea name=sql rows=20 cols=120>#{clean_where(hash['query'])}</textarea>
@@ -307,7 +307,7 @@ module Crossbeams
         EOS
       end
 
-      post '/admin_save_conversion' do
+      post '/admin/save_conversion' do
         yml = nil
         File.open(params[:temp_path], 'r') {|f| yml = f.read }
         hash = YAML.load(yml)
@@ -321,7 +321,7 @@ module Crossbeams
         EOS
       end
 
-      get '/admin_new' do
+      get '/admin/new' do
         @filename=''
         @caption=''
         @sql=''
@@ -329,7 +329,7 @@ module Crossbeams
         erb :admin_new
       end
 
-      post '/admin_create' do
+      post '/admin/create' do
         #@filename = params[:filename].trim.downcase.gsub(' ', '_').gsub(/_+/, '_')
         # Ensure the filename:
         # * is lowercase
@@ -376,7 +376,7 @@ module Crossbeams
         end
       end
 
-      get '/admin_edit/:id' do
+      get '/admin/edit/:id' do
         @rpt = lookup_report(params[:id])
 
         @col_defs = [{headerName: 'Column Name', field: 'name'},
@@ -433,29 +433,56 @@ module Crossbeams
         erb :admin_edit
       end
 
-      #TODO: On validation failure, return error message.
-      #      - change JS to display msg on error.
+      #TODO:
       #      - Make JS scoped by crossbeams.
       #      - split editors into another JS file
       #      - ditto formatters etc...
       post '/save_param_grid_col/:id' do
+        content_type :json
+
         @rpt = lookup_report(params[:id])
         col = @rpt.columns[params[:key_val]]
         attrib = params[:col_name]
         value  = params[:col_val]
         value  = nil if value.strip == ''
         # Should validate - width numeric, range... caption cannot be blank...
-        # FIXME: width must be saved as integer.....
+        # group_sum, avg etc should act as radio grps... --> Create service class to do validation.
+        # FIXME: width cannot be 0...
         if ['format', 'data_type'].include?(attrib) && !value.nil?
           col.send("#{attrib}=", value.to_sym)
         else
+          value = value.to_i if attrib == 'width' && !value.nil?
           col.send("#{attrib}=", value)
         end
+        puts ">>> ATTR: #{attrib} - #{value} #{value.class}"
+        if attrib == 'group_sum' && value == 'true' # NOTE string value of bool...
+          puts 'CHANGING...'
+          col.group_avg = false
+          col.group_min = false
+          col.group_max = false
+          send_changes = true
+        else
+          send_changes = false
+        end
 
-        filename = DmReportLister.new(settings.dm_reports_location).get_file_name_by_id(params[:id])
-        yp = Crossbeams::Dataminer::YamlPersistor.new(filename)
-        @rpt.save(yp)
-        "Changed #{attrib} for #{params[:key_val]}"
+        if value.nil? && attrib == 'caption' # Cannot be nil...
+          {status: 'error', message: "Caption for #{params[:key_val]} cannot be blank"}.to_json
+        else
+          filename = DmReportLister.new(settings.dm_reports_location).get_file_name_by_id(params[:id])
+          yp = Crossbeams::Dataminer::YamlPersistor.new(filename)
+          @rpt.save(yp)
+          if send_changes
+            {status: 'ok', message: "Changed #{attrib} for #{params[:key_val]}",
+             changedFields: {group_avg: false, group_min: false, group_max: false, group_none: 'A TEST'} }.to_json
+          else
+            {status: 'ok', message: "Changed #{attrib} for #{params[:key_val]}"}.to_json
+          end
+        end
+      end
+
+      get '/admin/new_parameter/:id' do
+        @rpt = lookup_report(params[:id])
+        erb :admin_new_parameter
       end
 
       get '/test_page' do

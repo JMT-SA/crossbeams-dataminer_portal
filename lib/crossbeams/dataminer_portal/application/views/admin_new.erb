@@ -3,7 +3,7 @@
 <% unless @err.empty? %>
   <p style="color:red;">ERROR: <%= @err %></p>
 <% end %>
-<form action='/<%= the_url_prefix %>admin_create' method=post>
+<form action='/<%= the_url_prefix %>admin/create' method=post>
 <input type='text' name='filename' placeholder='filename.yml' value='<%= @filename %>' required/>
 <input type='text' name='caption' placeholder='Caption' value='<%= @caption %>' required />
 SQL: <textarea name=sql rows=20 cols=120 required><%= @sql %></textarea>
