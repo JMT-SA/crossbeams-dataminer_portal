@@ -1,3 +1,8 @@
 <h1>TEST</h1>
 <p>Here's an image...</p>
 <img src="images/icon.png" />
+
+<h2>Settings</h2>
+<table style="border-collapse:collapse"><tr><th>Setting name</th><th>Value</th></tr>
+  <%= @res.map {|k,v| "<tr><td style='border:thin solid black'>#{k}</td><td style='border:thin solid black'>#{h(v)}</td></tr>" }.join("\n") %>
+</table>

@@ -1,1 +1,52 @@
-<h1>...</h1>
+<h1>Add a query parameter definition</h1>
+      <p>
+        column: choose from list of namespaced columns - or - enter something else (like id...) [must choose a table alias]
+      </p>
+
+<form action='/<%= the_url_prefix %>admin/create_parameter_def/<%= params[:id]%>' method=post>
+<table>
+  <tr>
+    <th>Namespaced column</th>
+    <th>Non-select column</th>
+    <th>Caption</th>
+    <th>Data type</th>
+    <th>Control type</th>
+    <th>List definition</th>
+    <th>Default value</th>
+  </tr>
+  <tr>
+    <td>
+      <select name="column">
+        <%= select_options(nil, @cols) %>
+      </select>
+    </td>
+    <td>select and input
+      <select name="table">
+        <%= select_options(nil, @tables) %>
+      </select>
+      .
+      <input type="text" name="field"></input>
+    </td>
+    <td>
+      <input type="text" name="caption" required></input>
+    </td>
+    <td>
+      <select name="data_type">
+        <%= select_options(nil, [['String', 'string'], ['Integer', 'integer'], ['Date', 'date']], false) %>
+      </select>
+    </td>
+    <td>
+      <select name="control_type">
+        <%= select_options(nil, [['Text box', 'text'], ['Dropdown list', 'list'], ['Date range', 'daterange']], false) %>
+      </select>
+    </td>
+    <td>
+      <input type="text" name="list_def"></input>
+    </td>
+    <td>
+      <input type="text" name="default_value"></input>
+    </td>
+  </tr>
+  </table>
+  <input type="submit" value="Add parameter" />
+</form>

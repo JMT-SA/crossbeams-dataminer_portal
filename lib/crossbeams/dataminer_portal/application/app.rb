@@ -2,6 +2,7 @@
 require 'sinatra'
 require 'sinatra/contrib'
 require 'sequel'
+require 'rack-flash'
 
 module Crossbeams
   module DataminerPortal
@@ -27,6 +28,9 @@ module Crossbeams
         file = File.new("log/dm_#{settings.environment}.log", 'a+')
         file.sync = true
         use Rack::CommonLogger, file
+
+        enable :sessions
+        use Rack::Flash, :sweep => true
 
         set :environment, :production
         set :root, File.dirname(__FILE__)
@@ -103,6 +107,26 @@ module Crossbeams
         def menu(with_admin=false)
           admin_menu = with_admin ? "<p><a href='/#{settings.url_prefix}admin'>Return to admin index</a></p>" : ''
           "<p><a href='/#{settings.url_prefix}index'>Return to report index</a></p>#{admin_menu}"
+        end
+
+        def h(text)
+          Rack::Utils.escape_html(text)
+        end
+
+        def select_options(value, opts, with_blank = true)
+          ar = []
+          ar << "<option value=''></option>" if with_blank
+          opts.each do |opt|
+            if opt.kind_of? Array
+              text, val = opt
+            else
+              val = opt
+              text  = opt
+            end
+            is_sel = val.to_s == value.to_s
+            ar << "<option value='#{val}'#{is_sel ? ' selected' : ''}>#{text}</option>"
+          end
+          ar.join("\n")
         end
       end
 
@@ -378,6 +402,7 @@ module Crossbeams
 
       get '/admin/edit/:id' do
         @rpt = lookup_report(params[:id])
+        @filename = File.basename(DmReportLister.new(settings.dm_reports_location).get_file_name_by_id(params[:id]))
 
         @col_defs = [{headerName: 'Column Name', field: 'name'},
                      {headerName: 'Sequence', field: 'sequence_no', cellClass: 'grid-number-column'}, # to be changed in group...
@@ -415,6 +440,10 @@ module Crossbeams
         @row_defs = @rpt.ordered_columns.map {|c| c.to_hash }
 
         @col_defs_params = [
+          {headerName: '', width: 60, suppressMenu: true, suppressSorting: true, suppressMovable: true, suppressFilter: true,
+           enableRowGroup: false, enablePivot: false, enableValue: false, suppressCsvExport: true,
+           valueGetter: "'/#{settings.url_prefix}admin/delete_param/#{params[:id]}/' + data.column + '|delete|Are you sure?'", colId: 'delete_link', cellRenderer: 'crossbeamsGridFormatters.hrefPromptFormatter'},
+
           {headerName: 'Column', field: 'column'},
           {headerName: 'Caption', field: 'caption'},
           {headerName: 'Data type', field: 'data_type'},
@@ -482,10 +511,78 @@ module Crossbeams
 
       get '/admin/new_parameter/:id' do
         @rpt = lookup_report(params[:id])
+        @cols = @rpt.ordered_columns.map { |c| c.namespaced_name }.compact
+        @tables = @rpt.tables
         erb :admin_new_parameter
       end
 
+      post '/admin/create_parameter_def/:id' do
+        # Validate... also cannot ad dif col exists as param already
+        @rpt = lookup_report(params[:id])
+
+        col_name = params[:column]
+        if col_name.nil? || col_name.empty?
+          col_name = "#{params[:table]},#{params[:field]}"
+        end
+        opts = {:control_type => params[:control_type].to_sym,
+                :data_type => params[:data_type].to_sym, caption: params[:caption]}
+        unless params[:list_def].nil? || params[:list_def].empty?
+          opts[:list_def] = params[:list_def]
+        end
+
+        param = Crossbeams::Dataminer::QueryParameterDefinition.new(col_name, opts)
+        @rpt.add_parameter_definition(param)
+
+        filename = DmReportLister.new(settings.dm_reports_location).get_file_name_by_id(params[:id])
+        yp = Crossbeams::Dataminer::YamlPersistor.new(filename)
+        @rpt.save(yp)
+
+        flash[:notice] = "Parameter has been added."
+        redirect to("/#{settings.url_prefix}admin/edit/#{params[:id]}")
+      end
+
+      # TODO: Can this be a "DELETE"?
+      post '/admin/delete_param/:rpt_id/:id' do
+        @rpt = lookup_report(params[:rpt_id])
+        id   = params[:id]
+        #puts @rpt.query_parameter_definitions.map { |p| p.column }.sort.join('; ')
+        @rpt.query_parameter_definitions.delete_if { |p| p.column == id }
+        filename = DmReportLister.new(settings.dm_reports_location).get_file_name_by_id(params[:id])
+        yp = Crossbeams::Dataminer::YamlPersistor.new(filename)
+        @rpt.save(yp)
+        #puts @rpt.query_parameter_definitions.map { |p| p.column }.sort.join('; ')
+        #params.inspect
+        flash[:notice] = "Parameter has been deleted."
+        redirect to("/#{settings.url_prefix}admin/edit/#{params[:rpt_id]}")
+      end
+
+      post '/admin/save_rpt_header/:id' do
+        # if new name <> old name, make sure new name has .yml, no spaces and lowercase....
+        @rpt = lookup_report(params[:id])
+
+        filename = DmReportLister.new(settings.dm_reports_location).get_file_name_by_id(params[:id])
+        if File.basename(filename) != params[:filename]
+          puts "new name: #{params[:filename]} for #{File.basename(filename)}"
+        else
+          puts "No change to file name"
+        end
+        @rpt.caption = params[:caption]
+        @rpt.limit = params[:limit].empty? ? nil : params[:limit].to_i
+        @rpt.offset = params[:offset].empty? ? nil : params[:offset].to_i
+        yp = Crossbeams::Dataminer::YamlPersistor.new(filename)
+        @rpt.save(yp)
+
+        # Need a flash here...
+        flash[:notice] = "Report's header has been changed."
+        redirect to("/#{settings.url_prefix}admin/edit/#{params[:id]}")
+      end
+
       get '/test_page' do
+        gots = %w{methodoverride inline_templates}
+        meths = (Crossbeams::DataminerPortal::WebPortal.methods(false) + Sinatra::Base.methods(false)).
+                  sort.map(&:to_s).select {|e| e[/=$/] }.map {|e| e[0..-2] } - gots
+        # meths.map {|meth| [meth, (Crossbeams::DataminerPortal::WebPortal.send(meth) rescue $!.inspect)] }
+        @res = meths.uniq.map {|m| [m, (Crossbeams::DataminerPortal::WebPortal.send(m) rescue $!.inspect)] }
         erb :test
       end
     end
