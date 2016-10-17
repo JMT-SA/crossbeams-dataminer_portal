@@ -442,7 +442,7 @@ module Crossbeams
         @col_defs_params = [
           {headerName: '', width: 60, suppressMenu: true, suppressSorting: true, suppressMovable: true, suppressFilter: true,
            enableRowGroup: false, enablePivot: false, enableValue: false, suppressCsvExport: true,
-           valueGetter: "'/#{settings.url_prefix}admin/delete_param/#{params[:id]}/' + data.column + '|delete|Are you sure?'", colId: 'delete_link', cellRenderer: 'crossbeamsGridFormatters.hrefPromptFormatter'},
+           valueGetter: "'/#{settings.url_prefix}admin/delete_param/#{params[:id]}/' + data.column + '|delete|Are you sure?|delete'", colId: 'delete_link', cellRenderer: 'crossbeamsGridFormatters.hrefPromptFormatter'},
 
           {headerName: 'Column', field: 'column'},
           {headerName: 'Caption', field: 'caption'},
@@ -541,8 +541,7 @@ module Crossbeams
         redirect to("/#{settings.url_prefix}admin/edit/#{params[:id]}")
       end
 
-      # TODO: Can this be a "DELETE"?
-      post '/admin/delete_param/:rpt_id/:id' do
+      delete '/admin/delete_param/:rpt_id/:id' do
         @rpt = lookup_report(params[:rpt_id])
         id   = params[:id]
         #puts @rpt.query_parameter_definitions.map { |p| p.column }.sort.join('; ')
