@@ -3,14 +3,16 @@
     <%= @menu %>
     <h2><%= @rpt.caption %></h2>
 
-    <form action='<%= @report_action %>' method=post>
-
-      <p><label>Limit: <input type="number" name='limit' min="1" /></label></p>
-
+    <form action='<%= @report_action %>' method=post class="pure-form pure-form-aligned">
+      <div class="pure-g">
+      <div class="pure-u-1">
+        <div class="field pure-control-group">
+          <label for="limit">Limit</label>
+          <input id="limit" type="number" name='limit' min="1" />
+        </div>
       <% @qps.each do |qp| %>
-        <div class="field-group">
+        <div class="field pure-control-group">
           <label class="label"><%=qp.caption %></label>
-          <div class="field">
             <select name="queryparam[<%=qp.column %>][operator]">
               <% if qp.control_type == :list %>
                 <%= make_options(@ops_sel_ar)%>
@@ -32,13 +34,12 @@
             <% else %>
               <input type="text" name="queryparam[<%=qp.column %>][value]" value="<%=qp.default_value %>" />
             <% end %>
-          </div>
         </div>
 
       <% end %>
-      <div class="field-group">
-        <div class="field">
-          <input type=submit>
-        </div>
+      <div class="actions pure-controls">
+        <input type="submit" name="commit" value="Run report" data-disable-with="Run report" class="pure-button pure-button-primary">
       </div>
+    </div>
+    </div>
     </form>

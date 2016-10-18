@@ -1,6 +1,5 @@
-<h1>Report results &ndash; RESULT</h1>
 <%= menu %>
-<button onclick="crossbeamsUtils.toggle_visibility('sql_code');return false">Toggle SQL</button>
+<button class="pure-button" onclick="crossbeamsUtils.toggle_visibility('sql_code', this);return false"><i class="fa fa-info"></i> Toggle SQL</button>
 <pre id="sql_code" style="display:none;"><%= sql_to_highlight(@rpt.runnable_sql) %></pre><hr>
 
 <p>Here would be links to show conditions, link back to params, links to save as view etc....</p>
@@ -13,15 +12,17 @@
 <div style="height:40em">
   <div class="grid-head">
     <label style="margin-left: 20px;">
-      <button onclick="crossbeamsGridEvents.csvExport('grd1', '<%= @rpt.caption.gsub(/[\/:*?"\\<>\|\r\n]/i, '-') %>.csv')">Export to CSV</button>
+      <button class="pure-button" onclick="crossbeamsGridEvents.csvExport('grd1', '<%= @rpt.caption.gsub(/[\/:*?"\\<>\|\r\n]/i, '-') %>.csv')"><i class="fa fa-file"></i> Export to CSV</button>
     </label>
     <label style="margin-left: 20px;">
-      <button onclick="crossbeamsGridEvents.toggleToolPanel('grd1')">Tool panel</button>
+      <button class="pure-button" onclick="crossbeamsGridEvents.toggleToolPanel('grd1')"><i class="fa fa-cog"></i> Tool panel</button>
     </label>
     <label style="margin-left: 20px;">
-      <input onkeyup="crossbeamsGridEvents.quickSearch(event)" placeholder='Search...' data-grid-id="grd1"/>
+      <input class="un-formed-input" onkeyup="crossbeamsGridEvents.quickSearch(event)" placeholder='Search...' data-grid-id="grd1"/>
     </label>
-    <%= @rpt.caption %>
+    <span class="grid-caption">
+      <%= @rpt.caption %>
+    </span>
   </div>
   <div id="grd1" style="height: 100%;" class="ag-blue"></div>
 </div>

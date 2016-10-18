@@ -71,6 +71,13 @@ module Crossbeams
         formatter.format(lexer.lex(wrapped_sql))
       end
 
+      def yml_to_highlight(yml)
+        theme = Rouge::Themes::Github.new
+        formatter = Rouge::Formatters::HTMLInline.new(theme)
+        lexer  = Rouge::Lexers::YAML.new
+        formatter.format(lexer.lex(yml))
+      end
+
       # TODO: Change this to work from filenames.
       def lookup_report(id)
         DmReportLister.new(settings.dm_reports_location).get_report_by_id(id)
@@ -105,8 +112,8 @@ module Crossbeams
         end
 
         def menu(with_admin=false)
-          admin_menu = with_admin ? "<p><a href='/#{settings.url_prefix}admin'>Return to admin index</a></p>" : ''
-          "<p><a href='/#{settings.url_prefix}index'>Return to report index</a></p>#{admin_menu}"
+          admin_menu = with_admin ? " | <a href='/#{settings.url_prefix}admin'>Return to admin index</a>" : ''
+          "<p><a href='/#{settings.url_prefix}index'>Return to report index</a>#{admin_menu}</p>"
         end
 
         def h(text)
@@ -134,7 +141,7 @@ module Crossbeams
       get '/' do
         # dataset = DB['select id from users']
         # "GOT THERE... running with #{settings.appname} <a href='#{settings.url_prefix}test_page'>Go to test page</a><p>Users: #{dataset.count} with ids: #{dataset.map(:id).join(', ')}.</p><p>Random user: #{DB['select user_name FROM users LIMIT 1'].first[:user_name]}</p>"
-        "<a href='/#{settings.url_prefix}index'>DATAMINER REPORT INDEX</a>"
+        erb "<a href='/#{settings.url_prefix}index'>DATAMINER REPORT INDEX</a> | <a href='/#{settings.url_prefix}admin'>Admin index</a>"
       end
 
       get '/index' do
@@ -142,9 +149,10 @@ module Crossbeams
 
         rpt_list = DmReportLister.new(settings.dm_reports_location).get_report_list(persist: true)
 
-        <<-EOS
+        erb(<<-EOS)
         <h1>Dataminer Reports</h1>
         <ol><li>#{rpt_list.map {|r| "<a href='/#{settings.url_prefix}report/#{r[:id]}'>#{r[:caption]}</a>" }.join('</li><li>')}</li></ol>
+        <p><a href='/#{settings.url_prefix}admin'>Admin index</a></p>
         EOS
       end
 
@@ -266,6 +274,7 @@ module Crossbeams
           hs[:width]          = col.width unless col.width.nil?
           hs[:enableValue]    = true if [:integer, :number].include?(col.data_type)
           hs[:enableRowGroup] = true unless hs[:enableValue] && !col.groupable
+          hs[:enablePivot]    = true unless hs[:enableValue] && !col.groupable
           if [:integer, :number].include?(col.data_type)
             hs[:cellClass] = 'grid-number-column'
             hs[:width]     = 100 if col.width.nil? && col.data_type == :integer
@@ -294,7 +303,15 @@ module Crossbeams
 
           erb :report_display
         rescue Sequel::DatabaseError => e
-          "#{menu}<p style='color:red;'>There is a problem with the SQL definition of this report:<p><p>Report: <em>#{@rpt.caption}</em></p>The error message is: <pre>#{e.message}</pre>"
+          erb(<<-EOS)
+          #{menu}<p style='color:red;'>There is a problem with the SQL definition of this report:</p>
+          <p>Report: <em>#{@rpt.caption}</em></p>The error message is:
+          <pre>#{e.message}</pre>
+          <button class="pure-button" onclick="crossbeamsUtils.toggle_visibility('sql_code', this);return false">
+            <i class="fa fa-info"></i> Toggle SQL
+          </button>
+          <pre id="sql_code" style="display:none;"><%= sql_to_highlight(@rpt.runnable_sql) %></pre>
+          EOS
         end
       end
 
@@ -305,30 +322,20 @@ module Crossbeams
         # Button to create new report.
         # "NOT YET WRITTEN..."
         @rpt_list = DmReportLister.new(settings.dm_reports_location).get_report_list(from_cache: true)
+        @menu     = menu
         erb :admin_index
       end
 
       post '/admin/convert' do
         unless params[:file] &&
-               (tmpfile = params[:file][:tempfile]) &&
-               (name = params[:file][:filename])
+               (@tmpfile = params[:file][:tempfile]) &&
+               (@name = params[:file][:filename])
           return "No file selected"
         end
-        yml = tmpfile.read
-        hash = YAML.load(yml)
-        <<-EOS
-        <h1>FILE: #{name}</h1>#{menu}
-
-        <form action='/#{settings.url_prefix}admin/save_conversion' method=post>
-        <input type='hidden' name='filename' value='#{name}' />
-        <input type='hidden' name='temp_path' value='#{tmpfile.path}' />
-        SQL: <textarea name=sql rows=20 cols=120>#{clean_where(hash['query'])}</textarea>
-        <p><strong>NB</strong> remove all <em>column={column}</em> parts of the WHERE clause before converting.
-        <br>This code tries to do as much as possible, but you need to check the where clause - especially for stray "and"s.</p>
-        <br><input type='submit' />
-        </form>
-        <pre>#{yml}</pre>
-        EOS
+        @yml  = @tmpfile.read
+        @hash = YAML.load(@yml)
+        @menu =  menu(true)
+        erb :admin_convert
       end
 
       post '/admin/save_conversion' do
@@ -339,9 +346,10 @@ module Crossbeams
         rpt = DmConverter.new(settings.dm_reports_location).convert_hash(hash, params[:filename])
         # yp = Crossbeams::Dataminer::YamlPersistor.new('report1.yml')
         # rpt.save(yp)
-        <<-EOS
-        <h1>Converted</h1>#{menu}
-        <pre>#{rpt.to_hash.to_yaml}</pre>
+        erb(<<-EOS)
+        <h1>Converted</h1>#{menu(true)}
+        <p>New YAML code:</p>
+        <pre>#{yml_to_highlight(rpt.to_hash.to_yaml)}</pre>
         EOS
       end
 
@@ -522,7 +530,7 @@ module Crossbeams
 
         col_name = params[:column]
         if col_name.nil? || col_name.empty?
-          col_name = "#{params[:table]},#{params[:field]}"
+          col_name = "#{params[:table]}.#{params[:field]}"
         end
         opts = {:control_type => params[:control_type].to_sym,
                 :data_type => params[:data_type].to_sym, caption: params[:caption]}
