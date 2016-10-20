@@ -388,7 +388,7 @@ module Crossbeams
 
         if @err.empty?
           # run the report with limit 1 and set up datatypes etc.
-          DmCreator.new(DB, @rpt).modify_column_dtattypes
+          DmCreator.new(DB, @rpt).modify_column_datatypes
           yp = Crossbeams::Dataminer::YamlPersistor.new(File.join(settings.dm_reports_location, @filename))
           @rpt.save(yp)
           DmReportLister.new(settings.dm_reports_location).get_report_list(persist: true) # Kludge to ensure list is rebuilt... (stuffs up anyone else running reports if id changes....)
@@ -535,7 +535,11 @@ module Crossbeams
         opts = {:control_type => params[:control_type].to_sym,
                 :data_type => params[:data_type].to_sym, caption: params[:caption]}
         unless params[:list_def].nil? || params[:list_def].empty?
-          opts[:list_def] = params[:list_def]
+          if params[:list_def].start_with?('[') # Array
+            opts[:list_def] = eval(params[:list_def]) # TODO: unpack the string into an array... (Job for the gem?)
+          else
+            opts[:list_def] = params[:list_def]
+          end
         end
 
         param = Crossbeams::Dataminer::QueryParameterDefinition.new(col_name, opts)
@@ -552,9 +556,13 @@ module Crossbeams
       delete '/admin/delete_param/:rpt_id/:id' do
         @rpt = lookup_report(params[:rpt_id])
         id   = params[:id]
-        #puts @rpt.query_parameter_definitions.map { |p| p.column }.sort.join('; ')
+        # puts ">>> #{id}"
+        # puts @rpt.query_parameter_definitions.length
+        # puts @rpt.query_parameter_definitions.map { |p| p.column }.sort.join('; ')
         @rpt.query_parameter_definitions.delete_if { |p| p.column == id }
-        filename = DmReportLister.new(settings.dm_reports_location).get_file_name_by_id(params[:id])
+        # puts @rpt.query_parameter_definitions.length
+        filename = DmReportLister.new(settings.dm_reports_location).get_file_name_by_id(params[:rpt_id])
+        # puts filename
         yp = Crossbeams::Dataminer::YamlPersistor.new(filename)
         @rpt.save(yp)
         #puts @rpt.query_parameter_definitions.map { |p| p.column }.sort.join('; ')

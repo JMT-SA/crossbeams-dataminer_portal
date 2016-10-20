@@ -1,6 +1,5 @@
 module Crossbeams
   module DataminerPortal
-
     class DmCreator
       attr_reader :report, :db
 
@@ -9,7 +8,7 @@ module Crossbeams
         @report = report
       end
 
-      def modify_column_dtattypes
+      def modify_column_datatypes
         lkp_types = column_datatypes
         report.columns.each do |name, column|
           data_type = lkp_types[name]
@@ -54,9 +53,6 @@ module Crossbeams
         end
         column_types
       end
-
     end
-
   end
-
 end
