@@ -37,6 +37,7 @@ Gem::Specification.new do |spec|
   spec.add_dependency "crossbeams-dataminer"
   spec.add_dependency "rouge"
   spec.add_dependency 'rack-flash3'
+  spec.add_dependency 'axlsx'
 
   spec.add_development_dependency "bundler", "~> 1.13"
   spec.add_development_dependency "rake", "~> 10.0"

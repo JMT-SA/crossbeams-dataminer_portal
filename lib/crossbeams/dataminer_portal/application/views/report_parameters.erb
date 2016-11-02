@@ -1,48 +1,50 @@
-    <h1>Fill in parameters</h1>
-    <%= @menu %>
-    <h2><%= @rpt.caption %></h2>
+<h1>Fill in parameters</h1>
+<%= @menu %>
+<h2><%= @rpt.caption %></h2>
 
-    <form action='<%= @report_action %>' method=post class="pure-form pure-form-aligned">
-      <div class="pure-g">
-      <div class="pure-u-1">
-        <div class="field pure-control-group">
-          <label for="limit">Limit</label>
-          <input id="limit" type="number" name='limit' min="1" value="<%= @rpt.limit %>" />
-        </div>
+<form action='<%= @report_action %>' method=post class="pure-form pure-form-aligned">
+  <div class="pure-g">
+    <div class="pure-u-1">
+      <div class="field pure-control-group">
+        <label for="limit">Limit</label>
+        <input id="limit" type="number" name='limit' min="1" value="<%= @rpt.limit %>" />
+      </div>
+      <div class="actions pure-controls">
+        <button type='submit' id="run_excel" name="submit" formaction="<%= @excel_action %>" data-disable-with="Create Excel report" class="pure-button pure-button"><i class="fa fa-file-excel-o"></i> Download Excel report</button>
+        <input type="submit" name="submit" value="Run report" data-disable-with="Run report" class="pure-button pure-button-primary">
+      </div>
+      <hr>
       <% @qps.each do |query_param| %>
         <div class="field pure-control-group">
           <label class="label"><%=query_param.caption %></label>
-            <select name="queryparam[<%=query_param.column %>][operator]">
-              <% if query_param.control_type == :list %>
-                <%= make_options(@ops_sel_ar)%>
-              <% elsif query_param.control_type == :date %>
-                <%= make_options(@ops_date_ar)%>
+          <select name="queryparam[<%=query_param.column %>][operator]">
+            <% if query_param.control_type == :list %>
+              <%= make_options(@ops_sel_ar)%>
+            <% elsif query_param.control_type == :date %>
+              <%= make_options(@ops_date_ar)%>
+            <% else %>
+              <%= make_options(@ops_ar)%>
+            <% end %>
+          </select>
+          <% if query_param.control_type == :list %>
+            <select name="queryparam[<%=query_param.column %>][value]">
+              <option value=""></option>
+              <% if query_param.includes_list_options? %>
+                <%= make_options(query_param.build_list.list_values) %>
               <% else %>
-                <%= make_options(@ops_ar)%>
+                <%= make_options(query_param.build_list {|sql| DB[sql].all.map {|r| r.values } }.list_values) %>
               <% end %>
             </select>
-            <% if query_param.control_type == :list %>
-              <select name="queryparam[<%=query_param.column %>][value]">
-                <option value=""></option>
-                <% if query_param.includes_list_options? %>
-                  <%= make_options(query_param.build_list.list_values) %>
-                <% else %>
-                  <%= make_options(query_param.build_list {|sql| DB[sql].all.map {|r| r.values } }.list_values) %>
-                <% end %>
-              </select>
-            <% elsif query_param.control_type == :date %>
-              <input type="date" name="queryparam[<%=query_param.column %>][from_value]" value="<%=query_param.default_value %>" />
-              and
-              <input type="date" name="queryparam[<%=query_param.column %>][to_value]" value="<%=query_param.default_value %>" />
-            <% else %>
-              <input type="text" name="queryparam[<%=query_param.column %>][value]" value="<%=query_param.default_value %>" />
-            <% end %>
+          <% elsif query_param.control_type == :date %>
+            <input type="date" name="queryparam[<%=query_param.column %>][from_value]" value="<%=query_param.default_value %>" />
+            and
+            <input type="date" name="queryparam[<%=query_param.column %>][to_value]" value="<%=query_param.default_value %>" />
+          <% else %>
+            <input type="text" name="queryparam[<%=query_param.column %>][value]" value="<%=query_param.default_value %>" />
+          <% end %>
         </div>
 
       <% end %>
-      <div class="actions pure-controls">
-        <input type="submit" name="commit" value="Run report" data-disable-with="Run report" class="pure-button pure-button-primary">
-      </div>
     </div>
-    </div>
-    </form>
+  </div>
+</form>

@@ -2,7 +2,7 @@ module Crossbeams
   module DataminerPortal
     class DmReportLister
       def initialize(path)
-        @path = path
+        @path = Pathname.new(path)
       end
 
       def get_report_by_id(id)

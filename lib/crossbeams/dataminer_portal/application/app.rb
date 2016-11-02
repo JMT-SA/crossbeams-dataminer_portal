@@ -91,6 +91,40 @@ module Crossbeams
         sql
       end
 
+      # TODO: Move out of app...
+      def setup_report_with_parameters(rpt, params)
+        in_params = params[:queryparam] || []
+        parms = []
+        in_params.each do |field,rules|
+          col = @rpt.column(field)
+          pn = col.nil? ? field : col.namespaced_name # should be from QparamDef...
+          #puts col && col.data_type
+          if 'between' == rules['operator']
+            unless rules['from_value'] == '' && rules['to_value'] == ''
+              # parms << Crossbeams::Dataminer::QueryParameter.new(pn, :operator => rules['operator'], :from_value => rules['from_value'], :to_value => rules['to_value'])
+              parms << Crossbeams::Dataminer::QueryParameter.new(pn, Crossbeams::Dataminer::OperatorValue.new(rules['operator'], [rules['from_value'], rules['to_value']]))
+            end
+          else
+            next if rules['value'] == '' && rules['operator'] != 'is_null' && rules['operator'] != 'not_null'
+            # , :convert => :to_i
+            #FIXME: param might not be part of returned columns - use param def to decide datatype.
+            #- rpt has param defs & new params apply to them, BUT should allow for new params that do not relate to param defs
+            #- when replacing WHERE with ID for e.g.
+            dtype = :string
+            rpt.query_parameter_definitions.each {|d| if d.column == field then dtype = d.data_type; end }
+            parms << Crossbeams::Dataminer::QueryParameter.new(pn, Crossbeams::Dataminer::OperatorValue.new(rules['operator'], rules['value'] || rules['to_value'], dtype))
+          end
+        end
+
+        rpt.limit = params[:limit].to_i if params[:limit] != ''
+        # rpt.offset = params[:offset].to_i if params[:offset] != ''
+        begin
+          rpt.apply_params(parms)
+        rescue StandardError => e
+          return "ERROR: #{e.message}"
+        end
+      end
+
 
       # ERB helpers.
       helpers do
@@ -222,8 +256,61 @@ module Crossbeams
 
         @menu = menu
         @report_action = "/#{settings.url_prefix}run_rpt/#{params[:id]}"
+        @excel_action = "/#{settings.url_prefix}run_xls_rpt/#{params[:id]}"
 
         erb :report_parameters
+      end
+
+      # Return a grid with the report.
+      post '/run_xls_rpt/:id' do
+        @rpt = lookup_report(params[:id])
+        setup_report_with_parameters(@rpt, params)
+
+        begin
+          xls_possible_types = {string: :string, integer: :integer, date: :string, datetime: :time, time: :time, boolean: :boolean, number: :float}
+          heads = []
+          fields = []
+          xls_types = []
+          x_styles = []
+          Axlsx::Package.new do | p |
+            p.workbook do | wb |
+              styles     = wb.styles
+              tbl_header = styles.add_style :b => true, :font_name => 'arial', :alignment => {:horizontal => :center}
+              # red_negative = styles.add_style :num_fmt => 8
+              delim4 = styles.add_style(:format_code=>"#,##0.0000;[Red]-#,##0.0000")
+              delim2 = styles.add_style(:format_code=>"#,##0.00;[Red]-#,##0.00")
+              and_styles = {delimited_1000_4: delim4, delimited_1000: delim2}
+              @rpt.ordered_columns.each do | col|
+                xls_types << xls_possible_types[col.data_type] || :string # BOOLEAN == 0,1 ... need to change this to Y/N...or use format TRUE|FALSE...
+                heads << col.caption
+                fields << col.name
+                # x_styles << (col.format == :delimited_1000_4 ? delim4 : :delimited_1000 ? delim2 : nil) # :num_fmt => Axlsx::NUM_FMT_YYYYMMDDHHMMSS / Axlsx::NUM_FMT_PERCENT
+                x_styles << and_styles[col.format]
+              end
+              puts x_styles.inspect
+              wb.add_worksheet do | sheet |
+                sheet.add_row heads, :style => tbl_header
+                DB[@rpt.runnable_sql].each do |row|
+                  sheet.add_row(fields.map {|f| v = row[f.to_sym]; v.is_a?(BigDecimal) ? v.to_f : v }, :types => xls_types, :style => x_styles)
+                end
+              end
+            end
+            response.headers['content_type'] = "application/vnd.ms-excel"
+            attachment(@rpt.caption.strip.gsub(/[\/:*?"\\<>\|\r\n]/i, '-') + '.xls')
+            response.write(p.to_stream.read) # NOTE: could this streaming to start downloading quicker?
+          end
+
+        rescue Sequel::DatabaseError => e
+          erb(<<-EOS)
+          #{menu}<p style='color:red;'>There is a problem with the SQL definition of this report:</p>
+          <p>Report: <em>#{@rpt.caption}</em></p>The error message is:
+          <pre>#{e.message}</pre>
+          <button class="pure-button" onclick="crossbeamsUtils.toggle_visibility('sql_code', this);return false">
+            <i class="fa fa-info"></i> Toggle SQL
+          </button>
+          <pre id="sql_code" style="display:none;"><%= sql_to_highlight(@rpt.runnable_sql) %></pre>
+          EOS
+        end
       end
 
       # Return a grid with the report.
@@ -237,36 +324,7 @@ module Crossbeams
 
         @rpt = lookup_report(params[:id])
 
-        in_params = params[:queryparam] || []
-        parms = []
-        in_params.each do |field,rules|
-          col = @rpt.column(field)
-          pn = col.nil? ? field : col.namespaced_name # should be from QparamDef...
-          #puts col && col.data_type
-          if 'between' == rules['operator']
-            unless rules['from_value'] == '' && rules['to_value'] == ''
-              # parms << Crossbeams::Dataminer::QueryParameter.new(pn, :operator => rules['operator'], :from_value => rules['from_value'], :to_value => rules['to_value'])
-              parms << Crossbeams::Dataminer::QueryParameter.new(pn, Crossbeams::Dataminer::OperatorValue.new(rules['operator'], [rules['from_value'], rules['to_value']]))
-            end
-          else
-            next if rules['value'] == '' && rules['operator'] != 'is_null' && rules['operator'] != 'not_null'
-            # , :convert => :to_i
-            #FIXME: param might not be part of returned columns - use param def to decide datatype.
-            #- rpt has param defs & new params apply to them, BUT should allow for new params that do not relate to param defs
-            #- when replacing WHERE with ID for e.g.
-            dtype = :string
-            @rpt.query_parameter_definitions.each {|d| if d.column == field then dtype = d.data_type; end }
-            parms << Crossbeams::Dataminer::QueryParameter.new(pn, Crossbeams::Dataminer::OperatorValue.new(rules['operator'], rules['value'] || rules['to_value'], dtype))
-          end
-        end
-
-        @rpt.limit = params[:limit].to_i if params[:limit] != ''
-        # rpt.offset = params[:offset].to_i if params[:offset] != ''
-        begin
-          @rpt.apply_params(parms)
-        rescue StandardError => e
-          return "ERROR: #{e.message}"
-        end
+        setup_report_with_parameters(@rpt, params)
 
         @col_defs = []
         @rpt.ordered_columns.each do | col|
@@ -302,6 +360,7 @@ module Crossbeams
           @row_defs = DB[@rpt.runnable_sql].to_a.map {|m| m.keys.each {|k| if m[k].is_a?(BigDecimal) then m[k] = m[k].to_f; end }; m; }
 
           erb :report_display
+
         rescue Sequel::DatabaseError => e
           erb(<<-EOS)
           #{menu}<p style='color:red;'>There is a problem with the SQL definition of this report:</p>
@@ -368,7 +427,7 @@ module Crossbeams
         # * has spaces converted to underscores
         # * more than one underscore in a row becomes one
         # * the name ends in ".yml"
-        s = params[:filename].strip.downcase.gsub(' ', '_').gsub(/_+/, '_')
+        s = params[:filename].strip.downcase.gsub(' ', '_').gsub(/_+/, '_').gsub(/[\/:*?"\\<>\|\r\n]/i, '-')
         @filename = File.basename(s).reverse.sub(File.extname(s).reverse, '').reverse << '.yml'
         @caption  = params[:caption]
         @sql      = params[:sql]
