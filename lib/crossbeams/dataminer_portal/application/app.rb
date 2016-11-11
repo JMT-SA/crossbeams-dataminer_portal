@@ -1,4 +1,7 @@
 #TODO: This should probably be changed to use Sinatra::Base so that Object is not poluted with Sinatra methods...
+#      - Use filenames instead of ids as keys.
+#      - Change this to just handle routes and pass the coding on to external objects.
+#      - code reloading
 require 'sinatra'
 require 'sinatra/contrib'
 require 'sequel'
@@ -169,6 +172,50 @@ module Crossbeams
           end
           ar.join("\n")
         end
+
+        def make_query_param_json(query_params)
+          common_ops = [
+            ['is', "="],
+            ['is not', "<>"],
+            ['greater than', ">"],
+            ['less than', "<"],
+            ['greater than or equal to', ">="],
+            ['less than or equal to', "<="],
+            ['is blank', "is_null"],
+            ['is NOT blank', "not_null"]
+          ]
+          text_ops = [
+            ['starts with', "starts_with"],
+            ['ends with', "ends_with"],
+            ['contains', "contains"]
+          ]
+          date_ops = [
+            ['between', "between"]
+          ]
+          # ar = []
+          qp_hash = {}
+          query_params.each do |query_param|
+            hs = {column: query_param.column, caption: query_param.caption,
+                  default_value: query_param.default_value, data_type: query_param.data_type,
+                  control_type: query_param.control_type}
+            if query_param.control_type == :list
+              hs[:operator] = common_ops
+              if query_param.includes_list_options?
+                hs[:list_values] = query_param.build_list.list_values
+              else
+                hs[:list_values] = query_param.build_list {|sql| DB[sql].all.map {|r| r.values } }.list_values
+              end
+            elsif query_param.control_type == :date
+              hs[:operator] = date_ops + common_ops
+            else
+              hs[:operator] = common_ops + text_ops
+            end
+            # ar << hs
+            qp_hash[query_param.column] = hs
+          end
+          # ar.to_json
+          qp_hash.to_json
+        end
       end
 
 
@@ -255,6 +302,7 @@ module Crossbeams
         # month, week, time
 
         @menu = menu
+        @report_ajax_action = "/#{settings.url_prefix}run_ajax_rpt/#{params[:id]}"
         @report_action = "/#{settings.url_prefix}run_rpt/#{params[:id]}"
         @excel_action = "/#{settings.url_prefix}run_xls_rpt/#{params[:id]}"
 
@@ -325,6 +373,84 @@ module Crossbeams
         @rpt = lookup_report(params[:id])
 
         setup_report_with_parameters(@rpt, params)
+
+        @col_defs = []
+        @rpt.ordered_columns.each do | col|
+          hs                  = {headerName: col.caption, field: col.name, hide: col.hide, headerTooltip: col.caption}
+          hs[:width]          = col.width unless col.width.nil?
+          hs[:enableValue]    = true if [:integer, :number].include?(col.data_type)
+          hs[:enableRowGroup] = true unless hs[:enableValue] && !col.groupable
+          hs[:enablePivot]    = true unless hs[:enableValue] && !col.groupable
+          if [:integer, :number].include?(col.data_type)
+            hs[:cellClass] = 'grid-number-column'
+            hs[:width]     = 100 if col.width.nil? && col.data_type == :integer
+            hs[:width]     = 120 if col.width.nil? && col.data_type == :number
+          end
+          if col.format == :delimited_1000
+            hs[:cellRenderer] = 'crossbeamsGridFormatters.numberWithCommas2'
+          end
+          if col.format == :delimited_1000_4
+            hs[:cellRenderer] = 'crossbeamsGridFormatters.numberWithCommas4'
+          end
+          if col.data_type == :boolean
+            hs[:cellRenderer] = 'crossbeamsGridFormatters.booleanFormatter'
+            hs[:cellClass]    = 'grid-boolean-column'
+            hs[:width]        = 100 if col.width.nil?
+          end
+
+          hs[:cellClassRules] = {"grid-row-red": "x === 'Fred'"} if col.name == 'author'
+
+          @col_defs << hs
+        end
+
+        begin
+          # Use module for BigDecimal change? - register_extension...?
+          @row_defs = DB[@rpt.runnable_sql].to_a.map {|m| m.keys.each {|k| if m[k].is_a?(BigDecimal) then m[k] = m[k].to_f; end }; m; }
+
+          erb :report_display
+
+        rescue Sequel::DatabaseError => e
+          erb(<<-EOS)
+          #{menu}<p style='color:red;'>There is a problem with the SQL definition of this report:</p>
+          <p>Report: <em>#{@rpt.caption}</em></p>The error message is:
+          <pre>#{e.message}</pre>
+          <button class="pure-button" onclick="crossbeamsUtils.toggle_visibility('sql_code', this);return false">
+            <i class="fa fa-info"></i> Toggle SQL
+          </button>
+          <pre id="sql_code" style="display:none;"><%= sql_to_highlight(@rpt.runnable_sql) %></pre>
+          EOS
+        end
+      end
+
+      post '/run_ajax_rpt/:id' do
+        input_parameters = JSON.parse(params[:param_array])
+        #{"col"=>"users.department_id", "op"=>"=", "opText"=>"is", "val"=>"17", "text"=>"Finance", "caption"=>"Department"}
+        @rpt = lookup_report(params[:id])
+
+        parms = []
+        # TODO: Change several of same col into "IN"...
+
+        # 1) group together all params for the same col...
+        # if all operators for col are =, create an IN, else create an OR wrapped in parens.
+        input_parameters.each do |in_param| # field,rules
+          col = in_param['col'] #@rpt.column(field)
+          param_def = @rpt.parameter_definition(col)
+          # if 'between' == in_param['op']
+          #   unless in_param['from_value'] == '' && in_param['to_value'] == ''
+          #     parms << Crossbeams::Dataminer::QueryParameter.new(col, Crossbeams::Dataminer::OperatorValue.new(in_param['op'], [in_param['from_value'], in_param['to_value']], param_def.data_type))
+          #   end
+          # else
+            parms << Crossbeams::Dataminer::QueryParameter.new(col, Crossbeams::Dataminer::OperatorValue.new(in_param['op'], in_param['val'], param_def.data_type))
+          # end
+        end
+
+        @rpt.limit = params[:limit].to_i if params[:limit] != ''
+        # rpt.offset = params[:offset].to_i if params[:offset] != ''
+        begin
+          @rpt.apply_params(parms)
+        rescue StandardError => e
+          return "ERROR: #{e.message}"
+        end
 
         @col_defs = []
         @rpt.ordered_columns.each do | col|
