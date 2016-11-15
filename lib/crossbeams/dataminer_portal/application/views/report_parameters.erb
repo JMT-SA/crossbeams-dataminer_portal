@@ -2,67 +2,52 @@
 <%= @menu %>
 <h2><%= @rpt.caption %></h2>
 
-<form action='<%= @report_action %>' method=post class="pure-form pure-form-aligned">
+<form action='<%= @report_action %>' id="rp_form" method=post class="pure-form pure-form-aligned" onsubmit="addJSONVarToForm('rp_form', current_values);">
   <div class="pure-g">
     <div class="pure-u-1">
       <div class="field pure-control-group">
         <label for="limit">Limit</label>
         <input id="limit" type="number" name='limit' min="1" value="<%= @rpt.limit %>" />
       </div>
-      <div class="actions pure-controls">
-        <button type='submit' id="run_excel" name="submit" formaction="<%= @excel_action %>" data-disable-with="Create Excel report" class="pure-button pure-button"><i class="fa fa-file-excel-o"></i> Download Excel report</button>
-        <input type="submit" name="submit" value="Run report" data-disable-with="Run report" class="pure-button pure-button-primary">
+      <div class="field pure-control-group">
+        <label for="offset">Start from (offset)</label>
+        <input id="offset" type="number" name='offset' min="1" value="<%= @rpt.offset %>" />
       </div>
-      <hr>
-      <h2>Test new param-gathering</h2>
-            <select id="select_param">
-              <option value=""></option>
-              <%= make_options(@qps.map { |qp| [qp.caption, qp.column] }) %>
-            </select>
-            <div id="qp_form" style="display:inline-block"></div>
-            <div id="param_display"></div>
-      <hr>
-      <% @qps.each do |query_param| %>
-        <div class="field pure-control-group">
-          <label class="label"><%=query_param.caption %></label>
-          <select name="queryparam[<%=query_param.column %>][operator]">
-            <% if query_param.control_type == :list %>
-              <%= make_options(@ops_sel_ar)%>
-            <% elsif query_param.control_type == :date %>
-              <%= make_options(@ops_date_ar)%>
-            <% else %>
-              <%= make_options(@ops_ar)%>
-            <% end %>
-          </select>
-          <% if query_param.control_type == :list %>
-            <select name="queryparam[<%=query_param.column %>][value]">
-              <option value=""></option>
-              <% if query_param.includes_list_options? %>
-                <%= make_options(query_param.build_list.list_values) %>
-              <% else %>
-                <%= make_options(query_param.build_list {|sql| DB[sql].all.map {|r| r.values } }.list_values) %>
-              <% end %>
-            </select>
-          <% elsif query_param.control_type == :date %>
-            <input type="date" name="queryparam[<%=query_param.column %>][from_value]" value="<%=query_param.default_value %>" />
-            and
-            <input type="date" name="queryparam[<%=query_param.column %>][to_value]" value="<%=query_param.default_value %>" />
-          <% else %>
-            <input type="text" name="queryparam[<%=query_param.column %>][value]" value="<%=query_param.default_value %>" />
-          <% end %>
-        </div>
 
-      <% end %>
+      <h3>Choose parameters</h3>
+      <select id="select_param">
+        <option value="">Select a parameter to apply</option>
+        <%= make_options(@qps.map { |qp| [qp.caption, qp.column] }) %>
+      </select>
+      <div id="qp_form" style="display:inline-block"></div>
+      <div id="param_display"></div>
+
+      <div class="actions pure-controls">
+        <button type='submit' id="run_excel" name="btnSubmit" formaction="<%= @excel_action %>" data-disable-with="Create Excel report" class="pure-button pure-button"><i class="fa fa-file-excel-o"></i> Download Excel report</button>
+        <input type="submit" name="btnSubmit" value="Run report" data-disable-with="Run report" class="pure-button pure-button-primary">
+      </div>
     </div>
   </div>
 </form>
   <script>
+    var getListIndex = function(node) {
+        var childs = node.parentNode.childNodes;
+        for (i = 0; i < childs.length; i++) {
+              if (node == childs[i]) break;
+            }
+        return i;
+    };
+    var removeQueryParamItem = function(node) {
+      var index = getListIndex(node);
+      current_values.splice(index, 1);
+      node.parentNode.removeChild(node);
+    };
     var queryItemAsText = function(item) {
-      return '<li>[X] ' + item.caption + ' ' + item.opText + ' ' + item.text;
+      return '<li style="list-style-type:none;"><i class="fa fa-minus" style="cursor:pointer;color:red;" onclick="removeQueryParamItem(this.parentNode)"></i> ' + item.caption + ' ' + item.opText + ' ' + item.text;
     };
     var querySelectionAsText = function(param_values) {
       if(param_values.length === 0) {
-        return '<li>No parameters selected</li>';
+        return '<li style="list-style-type:none;">None selected</li>';
       }
       else {
         var items = [];
@@ -72,26 +57,14 @@
         return items.join('');
       }
     };
-  var runReport = function() {
-    var http     = new XMLHttpRequest();
-    var url      = '<%= @report_ajax_action %>';
-    //var formData = JSON.stringify(current_values);
-    var formData = new FormData();
-    formData.append('param_array', JSON.stringify(current_values));
-    formData.append('limit', document.getElementById('limit').value);
-
-    //http.responseType = 'json'
-    http.open("POST", url, true);
-
-    http.onreadystatechange = function() {//Call a function when the state changes.
-      if(http.readyState == 4 && http.status == 200) {
-        window.open(); document.write(http.responseText)
-        // var resp = http.response;
-        // console.log('status', resp.status, 'message', resp.message);
-      }
-    }
-    http.send(formData);
-  };
+    var addJSONVarToForm = function(formId, jsonVar) {
+      var form = document.getElementById(formId);
+      var element1 = document.createElement("input");
+      element1.type = "hidden";
+      element1.value = JSON.stringify(jsonVar);
+      element1.name = "json_var";
+      form.appendChild(element1);
+    };
 
   var query_params = <%= make_query_param_json(@qps) %>;
   var current_values = [];
@@ -109,11 +82,22 @@
     sel += '</select>';
     return sel;
   };
+  var containsObject = function(obj, list) {
+    var i,hld;
+    for (i = 0; i < list.length; i++) {
+      hld = list[i];
+      //if (list[i] == obj) {
+      if (hld.col === obj.col && hld.op === obj.op && hld.val === obj.val) { // TODO: range of vals etc...
+        return true;
+      }
+    }
+
+    return false;
+  };
   var displayParamsAsText = function() {
-    var disp = '<h3>Parameters</h3><ul>';
+    var disp = '<ul>';
     disp += querySelectionAsText(current_values);
     disp += '</ul>';
-    disp += '<button type="button" class="pure-button pure-button" onclick="runReport()"><i class="fa fa-play"></i> Run</button> ... xls as well'
     document.getElementById('param_display').innerHTML = disp;
   };
 
@@ -132,10 +116,12 @@
       choice.text = choice.val;
     }
     choice.caption  = qp.caption;
-    // TODO: VALIDATE... (only add once, between needs 2 vals, val not blank etc.
-    console.log(choice);
-    current_values.push(choice);
-    displayParamsAsText();
+    if(!containsObject(choice, current_values)) {
+      // TODO: VALIDATE... (between needs 2 vals, val not blank etc.
+      console.log(choice);
+      current_values.push(choice);
+      displayParamsAsText();
+    }
   };
 
   (function() {

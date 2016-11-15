@@ -96,31 +96,41 @@ module Crossbeams
 
       # TODO: Move out of app...
       def setup_report_with_parameters(rpt, params)
-        in_params = params[:queryparam] || []
+        #{"col"=>"users.department_id", "op"=>"=", "opText"=>"is", "val"=>"17", "text"=>"Finance", "caption"=>"Department"}
+        input_parameters = JSON.parse(params[:json_var])
+        # logger.info input_parameters.inspect
         parms = []
-        in_params.each do |field,rules|
-          col = @rpt.column(field)
-          pn = col.nil? ? field : col.namespaced_name # should be from QparamDef...
-          #puts col && col.data_type
-          if 'between' == rules['operator']
-            unless rules['from_value'] == '' && rules['to_value'] == ''
-              # parms << Crossbeams::Dataminer::QueryParameter.new(pn, :operator => rules['operator'], :from_value => rules['from_value'], :to_value => rules['to_value'])
-              parms << Crossbeams::Dataminer::QueryParameter.new(pn, Crossbeams::Dataminer::OperatorValue.new(rules['operator'], [rules['from_value'], rules['to_value']]))
-            end
-          else
-            next if rules['value'] == '' && rules['operator'] != 'is_null' && rules['operator'] != 'not_null'
-            # , :convert => :to_i
-            #FIXME: param might not be part of returned columns - use param def to decide datatype.
-            #- rpt has param defs & new params apply to them, BUT should allow for new params that do not relate to param defs
-            #- when replacing WHERE with ID for e.g.
-            dtype = :string
-            rpt.query_parameter_definitions.each {|d| if d.column == field then dtype = d.data_type; end }
-            parms << Crossbeams::Dataminer::QueryParameter.new(pn, Crossbeams::Dataminer::OperatorValue.new(rules['operator'], rules['value'] || rules['to_value'], dtype))
-          end
+        # Check if this should become an IN parmeter (list of equal checks for a column.
+        eq_sel = input_parameters.select { |p| p['op'] == '=' }.group_by { |p| p['col'] }
+        in_sets = {}
+        in_keys = []
+        eq_sel.each do |col, qp|
+          in_keys << col if qp.length > 1
         end
 
-        rpt.limit = params[:limit].to_i if params[:limit] != ''
-        # rpt.offset = params[:offset].to_i if params[:offset] != ''
+        input_parameters.each do |in_param|
+          col = in_param['col']
+          if in_keys.include?(col)
+            in_sets[col] ||= []
+            in_sets[col] << in_param['val']
+            next
+          end
+          param_def = @rpt.parameter_definition(col)
+          # if 'between' == in_param['op']
+          #   unless in_param['from_value'] == '' && in_param['to_value'] == ''
+          #     parms << Crossbeams::Dataminer::QueryParameter.new(col, Crossbeams::Dataminer::OperatorValue.new(in_param['op'], [in_param['from_value'], in_param['to_value']], param_def.data_type))
+          #   end
+          # else
+            parms << Crossbeams::Dataminer::QueryParameter.new(col, Crossbeams::Dataminer::OperatorValue.new(in_param['op'], in_param['val'], param_def.data_type))
+          # end
+        end
+        in_sets.each do |col, vals|
+          param_def = @rpt.parameter_definition(col)
+          parms << Crossbeams::Dataminer::QueryParameter.new(col, Crossbeams::Dataminer::OperatorValue.new('in', vals, param_def.data_type))
+        end
+
+        rpt.limit  = params[:limit].to_i  if params[:limit] != ''
+        rpt.offset = params[:offset].to_i if params[:offset] != ''
         begin
           rpt.apply_params(parms)
         rescue StandardError => e
@@ -303,6 +313,7 @@ module Crossbeams
 
         @menu = menu
         @report_ajax_action = "/#{settings.url_prefix}run_ajax_rpt/#{params[:id]}"
+        # @report_action = "/#{settings.url_prefix}old_run_rpt/#{params[:id]}"
         @report_action = "/#{settings.url_prefix}run_rpt/#{params[:id]}"
         @excel_action = "/#{settings.url_prefix}run_xls_rpt/#{params[:id]}"
 
@@ -362,7 +373,7 @@ module Crossbeams
       end
 
       # Return a grid with the report.
-      post '/run_rpt/:id' do
+      post '/old_run_rpt/:id' do
         # How to handle IN (n,n,n,n,n)...
         # qparam => {username =>{1=>{op,val},2=>{op,val}},department_id =>{1=>{op,val},2=>{op,val}},created_at=>{op=>"between",from=>"",to=>""}}
         #
@@ -422,35 +433,9 @@ module Crossbeams
         end
       end
 
-      post '/run_ajax_rpt/:id' do
-        input_parameters = JSON.parse(params[:param_array])
-        #{"col"=>"users.department_id", "op"=>"=", "opText"=>"is", "val"=>"17", "text"=>"Finance", "caption"=>"Department"}
+      post '/run_rpt/:id' do
         @rpt = lookup_report(params[:id])
-
-        parms = []
-        # TODO: Change several of same col into "IN"...
-
-        # 1) group together all params for the same col...
-        # if all operators for col are =, create an IN, else create an OR wrapped in parens.
-        input_parameters.each do |in_param| # field,rules
-          col = in_param['col'] #@rpt.column(field)
-          param_def = @rpt.parameter_definition(col)
-          # if 'between' == in_param['op']
-          #   unless in_param['from_value'] == '' && in_param['to_value'] == ''
-          #     parms << Crossbeams::Dataminer::QueryParameter.new(col, Crossbeams::Dataminer::OperatorValue.new(in_param['op'], [in_param['from_value'], in_param['to_value']], param_def.data_type))
-          #   end
-          # else
-            parms << Crossbeams::Dataminer::QueryParameter.new(col, Crossbeams::Dataminer::OperatorValue.new(in_param['op'], in_param['val'], param_def.data_type))
-          # end
-        end
-
-        @rpt.limit = params[:limit].to_i if params[:limit] != ''
-        # rpt.offset = params[:offset].to_i if params[:offset] != ''
-        begin
-          @rpt.apply_params(parms)
-        rescue StandardError => e
-          return "ERROR: #{e.message}"
-        end
+        setup_report_with_parameters(@rpt, params)
 
         @col_defs = []
         @rpt.ordered_columns.each do | col|
