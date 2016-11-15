@@ -116,13 +116,11 @@ module Crossbeams
             next
           end
           param_def = @rpt.parameter_definition(col)
-          # if 'between' == in_param['op']
-          #   unless in_param['from_value'] == '' && in_param['to_value'] == ''
-          #     parms << Crossbeams::Dataminer::QueryParameter.new(col, Crossbeams::Dataminer::OperatorValue.new(in_param['op'], [in_param['from_value'], in_param['to_value']], param_def.data_type))
-          #   end
-          # else
+          if 'between' == in_param['op']
+            parms << Crossbeams::Dataminer::QueryParameter.new(col, Crossbeams::Dataminer::OperatorValue.new(in_param['op'], [in_param['val'], in_param['val_to']], param_def.data_type))
+          else
             parms << Crossbeams::Dataminer::QueryParameter.new(col, Crossbeams::Dataminer::OperatorValue.new(in_param['op'], in_param['val'], param_def.data_type))
-          # end
+          end
         end
         in_sets.each do |col, vals|
           param_def = @rpt.parameter_definition(col)
@@ -158,9 +156,10 @@ module Crossbeams
           settings.url_prefix
         end
 
-        def menu(with_admin=false)
-          admin_menu = with_admin ? " | <a href='/#{settings.url_prefix}admin'>Return to admin index</a>" : ''
-          "<p><a href='/#{settings.url_prefix}index'>Return to report index</a>#{admin_menu}</p>"
+        def menu(options = {})
+          admin_menu = options[:with_admin] ? " | <a href='/#{settings.url_prefix}admin'>Return to admin index</a>" : ''
+          back_menu  = options[:return_to_report] ? " | <a href='#{options[:return_action]}'>Back</a>" : ''
+          "<p><a href='/#{settings.url_prefix}index'>Return to report index</a>#{admin_menu}#{back_menu}</p>"
         end
 
         def h(text)
@@ -215,7 +214,7 @@ module Crossbeams
               else
                 hs[:list_values] = query_param.build_list {|sql| DB[sql].all.map {|r| r.values } }.list_values
               end
-            elsif query_param.control_type == :date
+            elsif query_param.control_type == :daterange
               hs[:operator] = date_ops + common_ops
             else
               hs[:operator] = common_ops + text_ops
@@ -248,72 +247,10 @@ module Crossbeams
       end
 
       get '/report/:id' do
-        # fn = File.join(settings.dm_reports_location, '.dm_report_list.yml')
-        # report_dictionary = YAML.load_file(fn)
-        # this_report = report_dictionary[params[:id].to_i]
-        # yp = Crossbeams::Dataminer::YamlPersistor.new(this_report[:file])
-        # @rpt = Crossbeams::Dataminer::Report.load(yp)
         @rpt = lookup_report(params[:id])
-
-        # repos = DmRepository.new
-        # @rpt = repos.get_report(params[:id].to_i)
-        #TODO: involve DB in calcing list contents
-        @ops_text = <<-EOP
-<select name="%s_operator">
-  <option value="=">is</option>
-  <option value="<>">is not</option>
-  <option value=">">greater than</option>
-  <option value="<">less than</option>
-  <option value=">=">greater than or equal to</option>
-  <option value="<=">less than or equal to</option>
-  <option value="is_null">is blank</option>
-  <option value="not_null">is NOT blank</option>
-  <option value="starts_with">starts with</option>
-  <option value="ends_with">ends with</option>
-  <option value="contains">contains</option>
-</select>
-        EOP
-        @ops_ar = [
-          ['is', "="],
-          ['is not', "<>"],
-          ['greater than', ">"],
-          ['less than', "<"],
-          ['greater than or equal to', ">="],
-          ['less than or equal to', "<="],
-          ['is blank', "is_null"],
-          ['is NOT blank', "not_null"],
-          ['starts with', "starts_with"],
-          ['ends with', "ends_with"],
-          ['contains', "contains"]]
-        @ops_sel_ar = [
-          ['is', "="],
-          ['is not', "<>"],
-          ['greater than', ">"],
-          ['less than', "<"],
-          ['greater than or equal to', ">="],
-          ['less than or equal to', "<="],
-          ['is blank', "is_null"],
-          ['is NOT blank', "not_null"]]
-        @ops_date_ar = [
-          ['between', "between"],
-          ['is', "="],
-          ['is not', "<>"],
-          ['greater than', ">"],
-          ['less than', "<"],
-          ['greater than or equal to', ">="],
-          ['less than or equal to', "<="],
-          ['is blank', "is_null"],
-          ['is NOT blank', "not_null"]]
-        # for date, s.b. between
-        # for list, all but start,end,contain...
         @qps = @rpt.query_parameter_definitions
-        #<%= @ops_text % qp[:column] %>
-        # input types: text, date, datetime-local, number
-        # month, week, time
 
         @menu = menu
-        @report_ajax_action = "/#{settings.url_prefix}run_ajax_rpt/#{params[:id]}"
-        # @report_action = "/#{settings.url_prefix}old_run_rpt/#{params[:id]}"
         @report_action = "/#{settings.url_prefix}run_rpt/#{params[:id]}"
         @excel_action = "/#{settings.url_prefix}run_xls_rpt/#{params[:id]}"
 
@@ -372,67 +309,6 @@ module Crossbeams
         end
       end
 
-      # Return a grid with the report.
-      post '/old_run_rpt/:id' do
-        # How to handle IN (n,n,n,n,n)...
-        # qparam => {username =>{1=>{op,val},2=>{op,val}},department_id =>{1=>{op,val},2=>{op,val}},created_at=>{op=>"between",from=>"",to=>""}}
-        #
-        # NOTES ------------------
-        # validate if between chosen, must have from && to values... (should do this in the UI)
-        # ------------------------
-
-        @rpt = lookup_report(params[:id])
-
-        setup_report_with_parameters(@rpt, params)
-
-        @col_defs = []
-        @rpt.ordered_columns.each do | col|
-          hs                  = {headerName: col.caption, field: col.name, hide: col.hide, headerTooltip: col.caption}
-          hs[:width]          = col.width unless col.width.nil?
-          hs[:enableValue]    = true if [:integer, :number].include?(col.data_type)
-          hs[:enableRowGroup] = true unless hs[:enableValue] && !col.groupable
-          hs[:enablePivot]    = true unless hs[:enableValue] && !col.groupable
-          if [:integer, :number].include?(col.data_type)
-            hs[:cellClass] = 'grid-number-column'
-            hs[:width]     = 100 if col.width.nil? && col.data_type == :integer
-            hs[:width]     = 120 if col.width.nil? && col.data_type == :number
-          end
-          if col.format == :delimited_1000
-            hs[:cellRenderer] = 'crossbeamsGridFormatters.numberWithCommas2'
-          end
-          if col.format == :delimited_1000_4
-            hs[:cellRenderer] = 'crossbeamsGridFormatters.numberWithCommas4'
-          end
-          if col.data_type == :boolean
-            hs[:cellRenderer] = 'crossbeamsGridFormatters.booleanFormatter'
-            hs[:cellClass]    = 'grid-boolean-column'
-            hs[:width]        = 100 if col.width.nil?
-          end
-
-          hs[:cellClassRules] = {"grid-row-red": "x === 'Fred'"} if col.name == 'author'
-
-          @col_defs << hs
-        end
-
-        begin
-          # Use module for BigDecimal change? - register_extension...?
-          @row_defs = DB[@rpt.runnable_sql].to_a.map {|m| m.keys.each {|k| if m[k].is_a?(BigDecimal) then m[k] = m[k].to_f; end }; m; }
-
-          erb :report_display
-
-        rescue Sequel::DatabaseError => e
-          erb(<<-EOS)
-          #{menu}<p style='color:red;'>There is a problem with the SQL definition of this report:</p>
-          <p>Report: <em>#{@rpt.caption}</em></p>The error message is:
-          <pre>#{e.message}</pre>
-          <button class="pure-button" onclick="crossbeamsUtils.toggle_visibility('sql_code', this);return false">
-            <i class="fa fa-info"></i> Toggle SQL
-          </button>
-          <pre id="sql_code" style="display:none;"><%= sql_to_highlight(@rpt.runnable_sql) %></pre>
-          EOS
-        end
-      end
-
       post '/run_rpt/:id' do
         @rpt = lookup_report(params[:id])
         setup_report_with_parameters(@rpt, params)
@@ -461,7 +337,7 @@ module Crossbeams
             hs[:width]        = 100 if col.width.nil?
           end
 
-          hs[:cellClassRules] = {"grid-row-red": "x === 'Fred'"} if col.name == 'author'
+          # hs[:cellClassRules] = {"grid-row-red": "x === 'Fred'"} if col.name == 'author'
 
           @col_defs << hs
         end
@@ -470,6 +346,7 @@ module Crossbeams
           # Use module for BigDecimal change? - register_extension...?
           @row_defs = DB[@rpt.runnable_sql].to_a.map {|m| m.keys.each {|k| if m[k].is_a?(BigDecimal) then m[k] = m[k].to_f; end }; m; }
 
+          @return_action = "/#{settings.url_prefix}report/#{params[:id]}"
           erb :report_display
 
         rescue Sequel::DatabaseError => e
@@ -504,7 +381,7 @@ module Crossbeams
         end
         @yml  = @tmpfile.read
         @hash = YAML.load(@yml)
-        @menu =  menu(true)
+        @menu =  menu(with_admin: true)
         erb :admin_convert
       end
 
@@ -517,7 +394,7 @@ module Crossbeams
         # yp = Crossbeams::Dataminer::YamlPersistor.new('report1.yml')
         # rpt.save(yp)
         erb(<<-EOS)
-        <h1>Converted</h1>#{menu(true)}
+        <h1>Converted</h1>#{menu(with_admin: true)}
         <p>New YAML code:</p>
         <pre>#{yml_to_highlight(rpt.to_hash.to_yaml)}</pre>
         EOS
@@ -564,7 +441,7 @@ module Crossbeams
           DmReportLister.new(settings.dm_reports_location).get_report_list(persist: true) # Kludge to ensure list is rebuilt... (stuffs up anyone else running reports if id changes....)
 
           erb(<<-EOS)
-          <h1>Saved file...got to admin index and edit...</h1>#{menu(true)}
+          <h1>Saved file...got to admin index and edit...</h1>#{menu(with_admin: true)}
           <p>Filename: <em><%= @filename %></em></p>
           <p>Caption: <em><%= @rpt.caption %></em></p>
           <p>SQL: <em><%= @rpt.runnable_sql %></em></p>
