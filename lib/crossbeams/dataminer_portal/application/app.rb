@@ -409,13 +409,13 @@ module Crossbeams
       end
 
       post '/admin/create' do
-        #@filename = params[:filename].trim.downcase.gsub(' ', '_').gsub(/_+/, '_')
+        #@filename = params[:filename].trim.downcase.tr(' ', '_').gsub(/_+/, '_')
         # Ensure the filename:
         # * is lowercase
         # * has spaces converted to underscores
         # * more than one underscore in a row becomes one
         # * the name ends in ".yml"
-        s = params[:filename].strip.downcase.gsub(' ', '_').gsub(/_+/, '_').gsub(/[\/:*?"\\<>\|\r\n]/i, '-')
+        s = params[:filename].strip.downcase.tr(' ', '_').gsub(/_+/, '_').gsub(/[\/:*?"\\<>\|\r\n]/i, '-')
         @filename = File.basename(s).reverse.sub(File.extname(s).reverse, '').reverse << '.yml'
         @caption  = params[:caption]
         @sql      = params[:sql]
