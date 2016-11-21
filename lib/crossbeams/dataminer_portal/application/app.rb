@@ -254,7 +254,7 @@ module Crossbeams
         @report_action = "/#{settings.url_prefix}run_rpt/#{params[:id]}"
         @excel_action = "/#{settings.url_prefix}run_xls_rpt/#{params[:id]}"
 
-        erb :report_parameters
+        erb :'report/parameters'
       end
 
       # Return a grid with the report.
@@ -347,7 +347,7 @@ module Crossbeams
           @row_defs = DB[@rpt.runnable_sql].to_a.map {|m| m.keys.each {|k| if m[k].is_a?(BigDecimal) then m[k] = m[k].to_f; end }; m; }
 
           @return_action = "/#{settings.url_prefix}report/#{params[:id]}"
-          erb :report_display
+          erb :'report/display'
 
         rescue Sequel::DatabaseError => e
           erb(<<-EOS)
