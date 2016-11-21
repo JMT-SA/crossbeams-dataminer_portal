@@ -370,7 +370,7 @@ module Crossbeams
         # "NOT YET WRITTEN..."
         @rpt_list = DmReportLister.new(settings.dm_reports_location).get_report_list(from_cache: true)
         @menu     = menu
-        erb :admin_index
+        erb :'admin/index'
       end
 
       post '/admin/convert' do
@@ -382,7 +382,7 @@ module Crossbeams
         @yml  = @tmpfile.read
         @hash = YAML.load(@yml)
         @menu =  menu(with_admin: true)
-        erb :admin_convert
+        erb :'admin/convert'
       end
 
       post '/admin/save_conversion' do
@@ -405,7 +405,7 @@ module Crossbeams
         @caption=''
         @sql=''
         @err=''
-        erb :admin_new
+        erb :'admin/new'
       end
 
       post '/admin/create' do
@@ -451,7 +451,7 @@ module Crossbeams
           </p>
           EOS
         else
-          erb :admin_new
+          erb :'admin/new'
         end
       end
 
@@ -514,7 +514,7 @@ module Crossbeams
           @row_defs_params << query_def.to_hash
         end
         @save_url = "/#{settings.url_prefix}save_param_grid_col/#{params[:id]}"
-        erb :admin_edit
+        erb :'admin/edit'
       end
 
       #TODO:
@@ -568,7 +568,7 @@ module Crossbeams
         @rpt = lookup_report(params[:id])
         @cols = @rpt.ordered_columns.map { |c| c.namespaced_name }.compact
         @tables = @rpt.tables
-        erb :admin_new_parameter
+        erb :'admin/new_parameter'
       end
 
       post '/admin/create_parameter_def/:id' do
