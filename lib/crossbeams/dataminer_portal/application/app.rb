@@ -638,15 +638,6 @@ module Crossbeams
         flash[:notice] = "Report's header has been changed."
         redirect to("/#{settings.url_prefix}admin/edit/#{params[:id]}")
       end
-
-      get '/test_page' do
-        gots = %w{methodoverride inline_templates}
-        meths = (Crossbeams::DataminerPortal::WebPortal.methods(false) + Sinatra::Base.methods(false)).
-                  sort.map(&:to_s).select {|e| e[/=$/] }.map {|e| e[0..-2] } - gots
-        # meths.map {|meth| [meth, (Crossbeams::DataminerPortal::WebPortal.send(meth) rescue $!.inspect)] }
-        @res = meths.uniq.map {|m| [m, (Crossbeams::DataminerPortal::WebPortal.send(m) rescue $!.inspect)] }
-        erb :test
-      end
     end
 
   end
