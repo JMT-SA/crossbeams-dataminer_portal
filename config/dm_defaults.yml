@@ -1,4 +1,4 @@
-appname: Sinatra DEFAULT development
+appname: Sinatra TEST development
 database:
   name: exporter
   user: postgres

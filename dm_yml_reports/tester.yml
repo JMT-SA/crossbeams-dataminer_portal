@@ -1,0 +1,37 @@
+---
+:caption: A Test report
+:sql: Select 1 AS number_field, 'A Name' AS string_field
+:limit: 
+:offset: 
+:columns:
+  number_field:
+    :name: number_field
+    :sequence_no: 1
+    :caption: Number field
+    :namespaced_name: 
+    :data_type: :string
+    :width: 
+    :format: 
+    :hide: false
+    :groupable: false
+    :group_by_seq: 
+    :group_sum: false
+    :group_avg: false
+    :group_min: false
+    :group_max: false
+  string_field:
+    :name: string_field
+    :sequence_no: 2
+    :caption: String field
+    :namespaced_name: 
+    :data_type: :string
+    :width: 
+    :format: 
+    :hide: false
+    :groupable: false
+    :group_by_seq: 
+    :group_sum: false
+    :group_avg: false
+    :group_min: false
+    :group_max: false
+:query_parameter_definitions: []
