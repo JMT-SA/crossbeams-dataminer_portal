@@ -2,9 +2,12 @@
 <%= @menu %>
 <h2><%= @rpt.caption %></h2>
 
-<form action='<%= @report_action %>' id="rp_form" method=post class="pure-form pure-form-aligned" onsubmit="crossbeamsUtils.addJSONVarToForm('rp_form', crossbeamsDataMinerParams.current_values);">
+<form action='<%= @report_action %>' id="rp_form" method=post class="pure-form pure-form-aligned" onsubmit="crossbeamsDataMinerParams.storeCurrentParams(<%=@rpt_id%>); crossbeamsUtils.addJSONVarToForm('rp_form', crossbeamsDataMinerParams.current_values);">
   <div class="pure-g">
     <div class="pure-u-1">
+      <div class="field pure-control-group">
+        <a href="#" id="reloadParams" style="display:none" onclick="crossbeamsDataMinerParams.loadCurrentParams()">get previous parameters</a>
+      </div>
       <div class="field pure-control-group">
         <label for="limit">Limit</label>
         <input id="limit" type="number" name='limit' min="1" value="<%= @rpt.limit %>" />
@@ -31,6 +34,11 @@
 </form>
 
 <script>
-  crossbeamsDataMinerParams.init(<%= make_query_param_json(@qps) %>);
+  crossbeamsDataMinerParams.init('rp_form', <%=@rpt_id%>, <%= make_query_param_json(@qps) %>);
+  <% if @load_params %>
+    crossbeamsDataMinerParams.loadCurrentParams();
+  <% else %>
+    crossbeamsDataMinerParams.buildReloadButton();
+  <% end %>
 </script>
 

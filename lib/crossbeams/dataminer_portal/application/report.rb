@@ -6,6 +6,8 @@ module Crossbeams
       get '/report/:id' do
         @rpt = lookup_report(params[:id])
         @qps = @rpt.query_parameter_definitions
+        @rpt_id = params[:id]
+        @load_params = params[:back] && params[:back] == 'y'
 
         @menu = menu
         @report_action = "/#{settings.url_prefix}run_rpt/#{params[:id]}"

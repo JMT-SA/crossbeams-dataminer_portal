@@ -92,7 +92,7 @@ module Sinatra
 
     def menu(options = {})
       admin_menu = options[:with_admin] ? " | <a href='/#{settings.url_prefix}admin'>Return to admin index</a>" : ''
-      back_menu  = options[:return_to_report] ? " | <a href='#{options[:return_action]}'>Back</a>" : ''
+      back_menu  = options[:return_to_report] ? " | <a href='#{options[:return_action]}?back=y'>Back</a>" : ''
       "<p><a href='/#{settings.url_prefix}index'>Return to report index</a>#{admin_menu}#{back_menu}</p>"
     end
 
