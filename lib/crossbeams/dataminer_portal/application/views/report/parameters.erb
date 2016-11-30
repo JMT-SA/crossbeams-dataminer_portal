@@ -2,7 +2,7 @@
 <%= @menu %>
 <h2><%= @rpt.caption %></h2>
 
-<form action='<%= @report_action %>' id="rp_form" method=post class="pure-form pure-form-aligned" onsubmit="crossbeamsUtils.addJSONVarToForm('rp_form', current_values);">
+<form action='<%= @report_action %>' id="rp_form" method=post class="pure-form pure-form-aligned" onsubmit="crossbeamsUtils.addJSONVarToForm('rp_form', crossbeamsDataMinerParams.current_values);">
   <div class="pure-g">
     <div class="pure-u-1">
       <div class="field pure-control-group">
@@ -23,198 +23,14 @@
       <div id="param_display"></div>
 
       <div class="actions pure-controls">
-        <button type='submit' id="run_excel" name="btnSubmit" formaction="<%= @excel_action %>" data-disable-with="Create Excel report" class="pure-button pure-button"><i class="fa fa-file-excel-o"></i> Download Excel report</button>
         <input type="submit" name="btnSubmit" value="Run report" data-disable-with="Run report" class="pure-button pure-button-primary">
+        <button type='submit' id="run_excel" name="btnSubmit" formaction="<%= @excel_action %>" data-disable-with="Create Excel report" class="pure-button pure-button"><i class="fa fa-file-excel-o"></i> Download Excel report</button>
       </div>
     </div>
   </div>
 </form>
-  <script>
-    var removeQueryParamItem = function(node) {
-      var index = crossbeamsUtils.getListIndex(node);
-      current_values.splice(index, 1);
-      node.parentNode.removeChild(node);
-    };
-    var queryItemAsText = function(item) {
-      var val, val_to;
-      if(item.op === 'is_null' || item.op === 'not_null') {
-        val = '';
-        val_to = '';
-      }
-      else {
-        val = item.text;
-        if(item.op === 'between') {
-          val_to = ' AND ' + item.text_to;
-        }
-        else {
-          val_to = '';
-        }
-      }
-      //return '<li style="list-style-type:none;"><i class="fa fa-minus" style="cursor:pointer;color:red;" onclick="removeQueryParamItem(this.parentNode)"></i> ' + item.caption + ' ' + item.opText + ' ' + item.text;
-      return '<li style="list-style-type:none;"><i class="fa fa-minus" style="cursor:pointer;color:red;" onclick="removeQueryParamItem(this.parentNode)"></i> ' + item.caption + ' ' + item.opText + ' ' + val + val_to;
-    };
-    var querySelectionAsText = function(param_values) {
-      if(param_values.length === 0) {
-        return '<li style="list-style-type:none;">None selected</li>';
-      }
-      else {
-        var items = [];
-        for(var i=0;i<param_values.length;i++) {
-          items.push(queryItemAsText(param_values[i]));
-        }
-        return items.join('');
-      }
-    };
 
-  var query_params = <%= make_query_param_json(@qps) %>;
-  var current_values = [];
-
-  var containsObject = function(obj, list) {
-    var i,hld;
-    for (i = 0; i < list.length; i++) {
-      hld = list[i];
-      //if (list[i] == obj) {
-      if (hld.col === obj.col && hld.op === obj.op && hld.val === obj.val && hld.val_to === obj.val_to) { // TODO: range of vals etc...
-        return true;
-      }
-    }
-
-    return false;
-  };
-  var displayParamsAsText = function() {
-    var disp = '<ul>';
-    disp += querySelectionAsText(current_values);
-    disp += '</ul>';
-    document.getElementById('param_display').innerHTML = disp;
-  };
-  var operatorParmChange = function(event) {
-    var val1 = document.getElementById('qp_value');
-    var val2 = document.getElementById('qp_value_to');
-    switch(event.target.value) {
-      case 'between':
-        val1.style.display = '';
-        val2.style.display = '';
-        break;
-      case 'is_null':
-        val1.style.display = 'none';
-        val2.style.display = 'none';
-        break;
-      case 'not_null':
-        val1.style.display = 'none';
-        val2.style.display = 'none';
-        break;
-      default:
-        val1.style.display = '';
-        val2.style.display = 'none';
-    }
-  }
-
-  var addQpFormParam = function() {
-    var choice    = {};
-    var valElem   = document.getElementById('qp_value');
-    var valElem2  = document.getElementById('qp_value_to');
-    choice.col    = document.getElementById('qp_column').value;
-    choice.op     = document.getElementById('qp_operator').value;
-    choice.opText = document.getElementById('qp_operator').options[document.getElementById('qp_operator').selectedIndex].text;
-    choice.val    = valElem.value;
-    choice.val_to = valElem2.value;
-    var qp        = query_params[choice.col];
-    if(qp.control_type === 'list') {
-      choice.text    = valElem.options[valElem.selectedIndex].text;
-      choice.text_to = '';
-    }
-    else {
-      choice.text    = choice.val;
-      choice.text_to = choice.val_to
-    }
-    choice.caption  = qp.caption;
-    // if something other than is null or not null, 1st val must be present. If between, both must be present...
-    if(choice.op !== 'is_null' && choice.op !== 'not_null') {
-      if(choice.val === '') { return false; }
-    }
-    if(choice.op === 'between') {
-      if(choice.val_to === '') { return false; }
-    }
-    if(!containsObject(choice, current_values)) {
-      current_values.push(choice);
-      displayParamsAsText();
-    }
-  };
-
-  (function() {
-
-    document.getElementById("select_param").addEventListener('change', function (event) {
-      var val = event.target.value, qp, val_input, input_type;
-      var qpForm = document.getElementById("qp_form");
-      if(val ==='') {
-        qpForm.innerHTML = '';
-      }
-      else {
-        qp = query_params[val];
-        input_type = '';
-        switch(qp.data_type) {
-          case 'number':
-            input_type = 'type="number"';
-            break;
-          case 'integer':
-            input_type = 'type="number" pattern="\d*"'; // Allow for minus sign?...
-            break;
-          case 'date':
-            input_type = 'type="date"';
-            break;
-          case 'datetime':
-            input_type = 'type="datetime-local"';
-        }
-
-        if(qp.control_type === 'list') {
-          val_input = crossbeamsUtils.makeSelect('qp_value', qp.list_values) +
-                        '<input name="qp_value_to" id="qp_value_to" style="display:none" />';
-        }
-        else {
-          if (qp.control_type === 'daterange') {
-            val_input = '<input name="qp_value" id="qp_value" value="'+ (qp.default_value === null ? '' : qp.default_value) +'" ' + input_type + ' />' +
-                        '<input name="qp_value_to" id="qp_value_to" ' + input_type + ' />';
-          }
-          else {
-            val_input = '<input name="qp_value" id="qp_value" value="'+ (qp.default_value === null ? '' : qp.default_value) +'"' + input_type + ' />' +
-                        '<input name="qp_value_to" id="qp_value_to" style="display:none"' + input_type + ' />';
-          }
-        }
-        qpForm.innerHTML = '<form id="dForm" action="#">' + '<input type="hidden" id="qp_column" value="' + qp.column + '" />' +
-          crossbeamsUtils.makeSelect('qp_operator', qp.operator) +
-          val_input +'<button type="button" class="pure-button pure-button" onclick="addQpFormParam()"><i class="fa fa-plus"></i></button></form>';
-      }
-            // event.stopPropagation();
-            // event.preventDefault();
-    });
-
-    displayParamsAsText();
-
-  }).call(this);
-
-// Listeners for change of parameters and of operators.
-checkNode = function(addedNode) {
-  if (addedNode.nodeType === 1){
-    if (addedNode.matches('#qp_operator')){
-      addedNode.addEventListener('change', operatorParmChange);
-      var event = document.createEvent('HTMLEvents');
-      event.initEvent('change', true, false);
-      addedNode.dispatchEvent(event);
-    }
-  }
-}
-var observer = new MutationObserver(function(mutations){
-  for (var i=0; i < mutations.length; i++){
-    for (var j=0; j < mutations[i].addedNodes.length; j++){
-      checkNode(mutations[i].addedNodes[j]);
-    }
-  }
-});
-
-observer.observe(document.documentElement, {
-  childList: true,
-  subtree: true
-});
-
-
+<script>
+  crossbeamsDataMinerParams.init(<%= make_query_param_json(@qps) %>);
 </script>
+
