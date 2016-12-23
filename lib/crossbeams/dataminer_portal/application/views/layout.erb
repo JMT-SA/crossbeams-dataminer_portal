@@ -48,7 +48,17 @@
     </style>
 </head>
 <body>
-
+  <% if env['crossbeams.banner'].nil? %>
+    <a href="/" style="font-size:1.8em;font-weight:bold;color:green;text-decoration:none;margin-left:1em;line-height:2.5em;">Data Miner</a>
+  <% else %>
+    <%= env['crossbeams.banner'] %>
+  <% end %>
+  <% if env['warden'] %>
+    <%= env['warden'] %>
+  <% else %>
+    NO WARDEN - HANAMI LOADED THIS APP BEFORE WARDEN...?
+    <%= Sinatra::Application.instance_variable_get("@middleware").inspect %>
+  <% end %>
   <div id="content">
     <%= yield %>
   </div>
